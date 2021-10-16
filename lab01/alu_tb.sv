@@ -7,7 +7,7 @@ module alu_tb;
         SUB_OPERATION = 3'b101
     } operation_t;
 
-    typedef bit [3:0] crc_t;
+    typedef bit [3:0] in_crc_t;
 
     typedef bit [10:0] packet_t;
 
@@ -19,7 +19,6 @@ module alu_tb;
     int A;
     int B;
     operation_t operation;
-    crc_t crc;
     bit [98:0] in_packet;
     bit [6:0] in_bit_count;
 
@@ -43,9 +42,8 @@ module alu_tb;
         A = 10;
         B = 20;
         operation = ADD_OPERATION;
-        crc = 4'b0101; // pre-calculated for now
 
-        in_packet = create_packet(B, A, operation, crc);
+        in_packet = create_packet(B, A, operation);
         repeat (98) begin : tester_send_packet
             @(negedge clk);
             sin = in_packet[98 - in_bit_count];
@@ -71,7 +69,8 @@ module alu_tb;
         return {2'b01, payload, 1'b1};
     endfunction : create_cmd_packet
 
-    function bit [98:0] create_packet(int X, int Y, operation_t operation, crc_t crc);
+    function bit [98:0] create_packet(int X, int Y, operation_t operation);
+        automatic in_crc_t crc = calculate_in_crc(X, Y, operation);
         return {
             create_data_packet(X[31:24]),
             create_data_packet(X[23:16]),
@@ -84,5 +83,28 @@ module alu_tb;
             create_cmd_packet({1'b0, operation, crc})
         };
     endfunction : create_packet
+
+    function in_crc_t calculate_in_crc(int X, int Y, operation_t operation);
+        automatic bit [67:0] d = {X, Y, 1'b1, operation};
+        static in_crc_t c = 0;
+        return {
+            d[67] ^ d[65] ^ d[63] ^ d[62] ^ d[59] ^ d[55] ^ d[54] ^ d[53] ^ d[52] ^ d[50] ^ d[48] ^
+            d[47] ^ d[44] ^ d[40] ^ d[39] ^ d[38] ^ d[37] ^ d[35] ^ d[33] ^ d[32] ^ d[29] ^ d[25] ^
+            d[24] ^ d[23] ^ d[22] ^ d[20] ^ d[18] ^ d[17] ^ d[14] ^ d[10] ^ d[9] ^ d[8] ^ d[7] ^
+            d[5] ^ d[3] ^ d[2] ^ c[1] ^ c[3],
+            d[67] ^ d[66] ^ d[64] ^ d[62] ^ d[61] ^ d[58] ^ d[54] ^ d[53] ^ d[52] ^ d[51] ^ d[49] ^
+            d[47] ^ d[46] ^ d[43] ^ d[39] ^ d[38] ^ d[37] ^ d[36] ^ d[34] ^ d[32] ^ d[31] ^ d[28] ^
+            d[24] ^ d[23] ^ d[22] ^ d[21] ^ d[19] ^ d[17] ^ d[16] ^ d[13] ^ d[9] ^ d[8] ^ d[7] ^
+            d[6] ^ d[4] ^ d[2] ^ d[1] ^ c[0] ^ c[2] ^ c[3],
+            d[67] ^ d[66] ^ d[65] ^ d[63] ^ d[61] ^ d[60] ^ d[57] ^ d[53] ^ d[52] ^ d[51] ^ d[50] ^
+            d[48] ^ d[46] ^ d[45] ^ d[42] ^ d[38] ^ d[37] ^ d[36] ^ d[35] ^ d[33] ^ d[31] ^ d[30] ^
+            d[27] ^ d[23] ^ d[22] ^ d[21] ^ d[20] ^ d[18] ^ d[16] ^ d[15] ^ d[12] ^ d[8] ^ d[7] ^
+            d[6] ^ d[5] ^ d[3] ^ d[1] ^ d[0] ^ c[1] ^ c[2] ^ c[3],
+            d[66] ^ d[64] ^ d[63] ^ d[60] ^ d[56] ^ d[55] ^ d[54] ^ d[53] ^ d[51] ^ d[49] ^ d[48] ^
+            d[45] ^ d[41] ^ d[40] ^ d[39] ^ d[38] ^ d[36] ^ d[34] ^ d[33] ^ d[30] ^ d[26] ^ d[25] ^
+            d[24] ^ d[23] ^ d[21] ^ d[19] ^ d[18] ^ d[15] ^ d[11] ^ d[10] ^ d[9] ^ d[8] ^ d[6] ^
+            d[4] ^ d[3] ^ d[0] ^ c[0] ^ c[2]
+        };
+    endfunction : calculate_in_crc
 
 endmodule : alu_tb
