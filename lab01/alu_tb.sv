@@ -20,7 +20,6 @@ module alu_tb;
     int B;
     operation_t operation;
     bit [98:0] in_packet;
-    bit [6:0] in_bit_count;
 
     mtm_Alu DUT(
         .clk,
@@ -44,10 +43,9 @@ module alu_tb;
         operation = ADD_OPERATION;
 
         in_packet = create_packet(B, A, operation);
-        repeat (98) begin : tester_send_packet
+        foreach (in_packet[i]) begin : tester_send_packet
             @(negedge clk);
-            sin = in_packet[98 - in_bit_count];
-            in_bit_count++;
+            sin = in_packet[i];
         end
 
         #2000 $finish;
@@ -55,7 +53,6 @@ module alu_tb;
 
     task reset_alu();
         sin = 1'b1;
-        in_bit_count = 0;
         rst_n = 1'b0;
         @(negedge clk);
         rst_n = 1'b1;
