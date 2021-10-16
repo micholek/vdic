@@ -11,6 +11,8 @@ module alu_tb;
 
     typedef bit [10:0] packet_t;
 
+    typedef packet_t[0:8] in_packets_t;
+
     bit clk;
     bit rst_n;
     bit sin;
@@ -19,7 +21,7 @@ module alu_tb;
     int A;
     int B;
     operation_t operation;
-    bit [98:0] in_packet;
+    in_packets_t in_packets;
     packet_t out_packets[0:4];
 
     mtm_Alu DUT(
@@ -43,10 +45,10 @@ module alu_tb;
         B = 20;
         operation = ADD_OPERATION;
 
-        in_packet = create_packet(B, A, operation);
-        foreach (in_packet[i]) begin : tester_send_packet
+        in_packets = create_in_packets(A, B, operation);
+        foreach (in_packets[i,j]) begin : tester_send_packet
             @(negedge clk);
-            sin = in_packet[i];
+            sin = in_packets[i][j];
         end
 
         @(negedge sout);
@@ -80,20 +82,20 @@ module alu_tb;
         return {2'b01, payload, 1'b1};
     endfunction : create_cmd_packet
 
-    function bit [98:0] create_packet(int X, int Y, operation_t operation);
-        automatic in_crc_t crc = calculate_in_crc(X, Y, operation);
+    function in_packets_t create_in_packets(int X, int Y, operation_t operation);
+        automatic in_crc_t crc = calculate_in_crc(Y, X, operation);
         return {
-            create_data_packet(X[31:24]),
-            create_data_packet(X[23:16]),
-            create_data_packet(X[15:8]),
-            create_data_packet(X[7:0]),
             create_data_packet(Y[31:24]),
             create_data_packet(Y[23:16]),
             create_data_packet(Y[15:8]),
             create_data_packet(Y[7:0]),
+            create_data_packet(X[31:24]),
+            create_data_packet(X[23:16]),
+            create_data_packet(X[15:8]),
+            create_data_packet(X[7:0]),
             create_cmd_packet({1'b0, operation, crc})
         };
-    endfunction : create_packet
+    endfunction : create_in_packets
 
     function in_crc_t calculate_in_crc(int X, int Y, operation_t operation);
         automatic bit [67:0] d = {X, Y, 1'b1, operation};
