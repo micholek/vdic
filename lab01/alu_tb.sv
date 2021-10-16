@@ -76,11 +76,11 @@ module alu_tb;
                 automatic bit [54:0] expected_out_packets_stream = {>>{expected_out_packets}};
                 // Check only the operation result, omit CMD packet (flags and CRC).
                 // For now assume input data without any errors (always 8 DATA packets).
-                assert(out_packets_stream[54-:32] === expected_out_packets_stream[54-:32])
+                assert(out_packets_stream[54-:44] === expected_out_packets_stream[54-:44])
                 else begin
                     $display("Test case [A = %0d, B = %0d, op = 3'b%03b] failed", A, B, operation);
-                    $display("Expected: %h, actual: %h", expected_out_packets_stream[54-:32],
-                        out_packets_stream[54-:32]);
+                    $display("Expected: %h, actual: %h", expected_out_packets_stream[54-:44],
+                        out_packets_stream[54-:44]);
                     test_result = "FAILED";
                 end
             end
