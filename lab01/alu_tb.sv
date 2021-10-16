@@ -20,6 +20,7 @@ module alu_tb;
     int B;
     operation_t operation;
     bit [98:0] in_packet;
+    packet_t out_packets[0:4];
 
     mtm_Alu DUT(
         .clk,
@@ -48,6 +49,15 @@ module alu_tb;
             sin = in_packet[i];
         end
 
+        @(negedge sout);
+        foreach (out_packets[i,j]) begin
+            @(negedge clk);
+            out_packets[i][j] = sout;
+            if (i === 0 && j === 0 && is_cmd_packet(out_packets[0])) begin
+                break;
+            end
+        end
+
         #2000 $finish;
     end
 
@@ -57,6 +67,10 @@ module alu_tb;
         @(negedge clk);
         rst_n = 1'b1;
     endtask : reset_alu
+
+    function bit is_cmd_packet(packet_t packet);
+        return packet[9] == 1'b1;
+    endfunction : is_cmd_packet
 
     function packet_t create_data_packet(byte payload);
         return {2'b00, payload, 1'b1};
