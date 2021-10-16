@@ -8,10 +8,13 @@ module alu_tb;
     } operation_t;
 
     typedef bit [3:0] in_crc_t;
+    typedef bit [2:0] out_crc_t;
 
     typedef bit [10:0] packet_t;
 
     typedef packet_t[0:8] in_packets_t;
+
+    typedef packet_t[0:4] out_packets_t;
 
     bit clk;
     bit rst_n;
@@ -22,7 +25,9 @@ module alu_tb;
     int B;
     operation_t operation;
     in_packets_t in_packets;
-    packet_t out_packets[0:4];
+    out_packets_t out_packets;
+
+    string test_result = "PASSED";
 
     mtm_Alu DUT(
         .clk,
@@ -60,7 +65,30 @@ module alu_tb;
             end
         end
 
+        begin : tester_temp_check
+            automatic out_packets_t expected_out_packets = get_expected_out_packets(
+                A,
+                B,
+                operation);
+
+            automatic bit [54:0] out_packets_stream = {>>{out_packets}};
+            automatic bit [54:0] expected_out_packets_stream = {>>{expected_out_packets}};
+            // Check only the operation result, omit CMD packet (flags and CRC).
+            // For now assume input data without any errors (always 8 DATA packets).
+            assert(out_packets_stream[54-:32] === expected_out_packets_stream[54-:32])
+            else begin
+                $display("Test case [A = %0d, B = %0d, op = 3'b%03b] failed", A, B, operation);
+                $display("Expected: %h, actual: %h", expected_out_packets_stream[54-:32],
+                    out_packets_stream[54-:32]);
+                test_result = "FAILED";
+            end
+        end
+
         #2000 $finish;
+    end
+
+    final begin : finish_of_the_test
+        $display("Test %s", test_result);
     end
 
     task reset_alu();
@@ -119,5 +147,44 @@ module alu_tb;
             d[4] ^ d[3] ^ d[0] ^ c[0] ^ c[2]
         };
     endfunction : calculate_in_crc
+
+    function out_packets_t get_expected_out_packets(int X, int Y, operation_t operation);
+        int op_result;
+        // CRC and flags don't matter for now.
+        out_crc_t crc;
+        static bit [3:0] flags = 4'b0000;
+
+        case (operation)
+            AND_OPERATION : op_result = X & Y;
+            OR_OPERATION : op_result = X | Y;
+            ADD_OPERATION : op_result = X + Y;
+            SUB_OPERATION : op_result = X - Y;
+        endcase
+
+        crc = calculate_out_crc(op_result, flags);
+
+        return {
+            create_data_packet(op_result[31:24]),
+            create_data_packet(op_result[23:16]),
+            create_data_packet(op_result[15:8]),
+            create_data_packet(op_result[7:0]),
+            create_cmd_packet({1'b0, flags, crc})
+        };
+    endfunction : get_expected_out_packets
+
+    function out_crc_t calculate_out_crc(int op_result, bit [3:0] out_flags);
+        automatic bit [36:0] d = {op_result, 1'b0, out_flags};
+        static out_crc_t c = 0;
+        return {
+            d[36] ^ d[34] ^ d[31] ^ d[30] ^ d[29] ^ d[27] ^ d[24] ^ d[23] ^ d[22] ^ d[20] ^ d[17] ^
+            d[16] ^ d[15] ^ d[13] ^ d[10] ^ d[9] ^ d[8] ^ d[6] ^ d[3] ^ d[2] ^ d[1] ^ c[0] ^ c[2],
+            d[36] ^ d[35] ^ d[33] ^ d[30] ^ d[29] ^ d[28] ^ d[26] ^ d[23] ^ d[22] ^ d[21] ^ d[19] ^
+            d[16] ^ d[15] ^ d[14] ^ d[12] ^ d[9] ^ d[8] ^ d[7] ^ d[5] ^ d[2] ^ d[1] ^ d[0] ^ c[1] ^
+            c[2],
+            d[35] ^ d[32] ^ d[31] ^ d[30] ^ d[28] ^ d[25] ^ d[24] ^ d[23] ^ d[21] ^ d[18] ^ d[17] ^
+            d[16] ^ d[14] ^ d[11] ^ d[10] ^ d[9] ^ d[7] ^ d[4] ^ d[3] ^ d[2] ^ d[0] ^ c[1]
+        };
+    endfunction : calculate_out_crc
+
 
 endmodule : alu_tb
