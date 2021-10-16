@@ -119,16 +119,16 @@ module alu_tb;
     endfunction : create_cmd_packet
 
     function in_packets_t create_in_packets(int X, int Y, operation_t operation);
-        automatic in_crc_t crc = calculate_in_crc(Y, X, operation);
+        automatic in_crc_t crc = calculate_in_crc(X, Y, operation);
         return {
-            create_data_packet(Y[31:24]),
-            create_data_packet(Y[23:16]),
-            create_data_packet(Y[15:8]),
-            create_data_packet(Y[7:0]),
             create_data_packet(X[31:24]),
             create_data_packet(X[23:16]),
             create_data_packet(X[15:8]),
             create_data_packet(X[7:0]),
+            create_data_packet(Y[31:24]),
+            create_data_packet(Y[23:16]),
+            create_data_packet(Y[15:8]),
+            create_data_packet(Y[7:0]),
             create_cmd_packet({1'b0, operation, crc})
         };
     endfunction : create_in_packets
