@@ -72,8 +72,8 @@ module alu_tb;
                     B,
                     operation);
 
-                automatic bit [54:0] out_packets_stream = {>>{out_packets}};
-                automatic bit [54:0] expected_out_packets_stream = {>>{expected_out_packets}};
+                automatic bit [54:0] out_packets_stream = out_packets;
+                automatic bit [54:0] expected_out_packets_stream = expected_out_packets;
                 // Check only the operation result, omit CMD packet (flags and CRC).
                 // For now assume input data without any errors (always 8 DATA packets).
                 assert(out_packets_stream[54-:44] === expected_out_packets_stream[54-:44])
