@@ -46,41 +46,43 @@ module alu_tb;
     initial begin : tester
         reset_alu();
 
-        A = 10;
-        B = 20;
-        operation = ADD_OPERATION;
+        repeat(1000) begin
+            A = 10;
+            B = 20;
+            operation = generate_operation();
 
-        in_packets = create_in_packets(A, B, operation);
-        foreach (in_packets[i,j]) begin : tester_send_packet
-            @(negedge clk);
-            sin = in_packets[i][j];
-        end
-
-        @(negedge sout);
-        foreach (out_packets[i,j]) begin
-            @(negedge clk);
-            out_packets[i][j] = sout;
-            if (i === 0 && j === 0 && is_cmd_packet(out_packets[0])) begin
-                break;
+            in_packets = create_in_packets(A, B, operation);
+            foreach (in_packets[i,j]) begin : tester_send_packet
+                @(negedge clk);
+                sin = in_packets[i][j];
             end
-        end
 
-        begin : tester_temp_check
-            automatic out_packets_t expected_out_packets = get_expected_out_packets(
-                A,
-                B,
-                operation);
+            @(negedge sout);
+            foreach (out_packets[i,j]) begin
+                @(negedge clk);
+                out_packets[i][j] = sout;
+                if (i === 0 && j === 0 && is_cmd_packet(out_packets[0])) begin
+                    break;
+                end
+            end
 
-            automatic bit [54:0] out_packets_stream = {>>{out_packets}};
-            automatic bit [54:0] expected_out_packets_stream = {>>{expected_out_packets}};
-            // Check only the operation result, omit CMD packet (flags and CRC).
-            // For now assume input data without any errors (always 8 DATA packets).
-            assert(out_packets_stream[54-:32] === expected_out_packets_stream[54-:32])
-            else begin
-                $display("Test case [A = %0d, B = %0d, op = 3'b%03b] failed", A, B, operation);
-                $display("Expected: %h, actual: %h", expected_out_packets_stream[54-:32],
-                    out_packets_stream[54-:32]);
-                test_result = "FAILED";
+            begin : tester_temp_check
+                automatic out_packets_t expected_out_packets = get_expected_out_packets(
+                    A,
+                    B,
+                    operation);
+
+                automatic bit [54:0] out_packets_stream = {>>{out_packets}};
+                automatic bit [54:0] expected_out_packets_stream = {>>{expected_out_packets}};
+                // Check only the operation result, omit CMD packet (flags and CRC).
+                // For now assume input data without any errors (always 8 DATA packets).
+                assert(out_packets_stream[54-:32] === expected_out_packets_stream[54-:32])
+                else begin
+                    $display("Test case [A = %0d, B = %0d, op = 3'b%03b] failed", A, B, operation);
+                    $display("Expected: %h, actual: %h", expected_out_packets_stream[54-:32],
+                        out_packets_stream[54-:32]);
+                    test_result = "FAILED";
+                end
             end
         end
 
@@ -90,6 +92,12 @@ module alu_tb;
     final begin : finish_of_the_test
         $display("Test %s", test_result);
     end
+
+    function operation_t generate_operation();
+        operation_t operation;
+        $cast(operation, {1'($random), 1'b0, 1'($random)});
+        return operation;
+    endfunction : generate_operation
 
     task reset_alu();
         sin = 1'b1;
