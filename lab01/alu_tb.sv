@@ -14,8 +14,6 @@ module alu_tb;
 
     typedef packet_t[0:8] in_packets_t;
 
-    typedef packet_t[0:4] out_packets_t;
-
     bit clk;
     bit rst_n;
     bit sin;
@@ -25,7 +23,6 @@ module alu_tb;
     int B;
     operation_t operation;
     in_packets_t in_packets;
-    out_packets_t out_packets;
 
     string test_result = "PASSED";
 
@@ -57,36 +54,57 @@ module alu_tb;
                 sin = in_packets[i][j];
             end
 
-            @(negedge sout);
-            foreach (out_packets[i,j]) begin
-                @(negedge clk);
-                out_packets[i][j] = sout;
-                if (i === 0 && j === 0 && is_cmd_packet(out_packets[0])) begin
-                    break;
-                end
-            end
-
             begin : tester_temp_check
-                automatic out_packets_t expected_out_packets = get_expected_out_packets(
-                    A,
-                    B,
-                    operation);
-
-                automatic bit [54:0] out_packets_stream = out_packets;
-                automatic bit [54:0] expected_out_packets_stream = expected_out_packets;
-                // Check only the operation result, omit CMD packet (flags and CRC).
-                // For now assume input data without any errors (always 8 DATA packets).
-                assert(out_packets_stream[54-:44] === expected_out_packets_stream[54-:44])
+                // Temporary checking if the structure of data stream is correct.
+                automatic bit [98:0] in_stream = in_packets;
+                automatic int actual_A = {
+                    in_stream[96-:8], in_stream[85-:8], in_stream[74-:8], in_stream[63-:8]
+                };
+                automatic int actual_B = {
+                    in_stream[52-:8], in_stream[41-:8], in_stream[30-:8], in_stream[19-:8]
+                };
+                automatic byte actual_cmd_payload = in_stream[8-:8];
+                assert({in_stream[98], in_stream[87], in_stream[76], in_stream[65], in_stream[54],
+                            in_stream[43], in_stream[32], in_stream[21], in_stream[10]}
+                        === 9'b000000000)
                 else begin
-                    $display("Test case [A = %0d, B = %0d, op = 3'b%03b] failed", A, B, operation);
-                    $display("Expected: %h, actual: %h", expected_out_packets_stream[54-:44],
-                        out_packets_stream[54-:44]);
+                    $display("Invalid first bits of packets");
+                    test_result = "FAILED";
+                end
+                assert({in_stream[97], in_stream[86], in_stream[75], in_stream[64], in_stream[53],
+                            in_stream[42], in_stream[31], in_stream[20], in_stream[9]}
+                        === 9'b000000001)
+                else begin
+                    $display("Invalid second bits of packets");
+                    test_result = "FAILED";
+                end
+                assert({in_stream[88], in_stream[77], in_stream[66], in_stream[55], in_stream[44],
+                            in_stream[33], in_stream[22], in_stream[11], in_stream[0]}
+                        === 9'b111111111)
+                else begin
+                    $display("Invalid last bits of packets");
+                    test_result = "FAILED";
+                end
+                assert(actual_A === A)
+                else begin
+                    $display("Invalid first operand (expected: %0d, actual: %0d", A, actual_A);
+                    test_result = "FAILED";
+                end
+                assert(actual_B === B)
+                else begin
+                    $display("Invalid second operand (expected: %0d, actual: %0d", B, actual_B);
+                    test_result = "FAILED";
+                end
+                assert(actual_cmd_payload === {1'b0, operation, calculate_in_crc(A, B, operation)})
+                else begin
+                    $display("Invalid cmd packet payload for A = %0d, B = %0d, op = %0d", A, B,
+                        operation, "(actual: %0h)", actual_cmd_payload);
                     test_result = "FAILED";
                 end
             end
         end
 
-        #2000 $finish;
+        $finish;
     end
 
     final begin : finish_of_the_test
@@ -155,44 +173,5 @@ module alu_tb;
             d[4] ^ d[3] ^ d[0] ^ c[0] ^ c[2]
         };
     endfunction : calculate_in_crc
-
-    function out_packets_t get_expected_out_packets(int X, int Y, operation_t operation);
-        int op_result;
-        // CRC and flags don't matter for now.
-        out_crc_t crc;
-        static bit [3:0] flags = 4'b0000;
-
-        case (operation)
-            AND_OPERATION : op_result = X & Y;
-            OR_OPERATION : op_result = X | Y;
-            ADD_OPERATION : op_result = X + Y;
-            SUB_OPERATION : op_result = X - Y;
-        endcase
-
-        crc = calculate_out_crc(op_result, flags);
-
-        return {
-            create_data_packet(op_result[31:24]),
-            create_data_packet(op_result[23:16]),
-            create_data_packet(op_result[15:8]),
-            create_data_packet(op_result[7:0]),
-            create_cmd_packet({1'b0, flags, crc})
-        };
-    endfunction : get_expected_out_packets
-
-    function out_crc_t calculate_out_crc(int op_result, bit [3:0] out_flags);
-        automatic bit [36:0] d = {op_result, 1'b0, out_flags};
-        static out_crc_t c = 0;
-        return {
-            d[36] ^ d[34] ^ d[31] ^ d[30] ^ d[29] ^ d[27] ^ d[24] ^ d[23] ^ d[22] ^ d[20] ^ d[17] ^
-            d[16] ^ d[15] ^ d[13] ^ d[10] ^ d[9] ^ d[8] ^ d[6] ^ d[3] ^ d[2] ^ d[1] ^ c[0] ^ c[2],
-            d[36] ^ d[35] ^ d[33] ^ d[30] ^ d[29] ^ d[28] ^ d[26] ^ d[23] ^ d[22] ^ d[21] ^ d[19] ^
-            d[16] ^ d[15] ^ d[14] ^ d[12] ^ d[9] ^ d[8] ^ d[7] ^ d[5] ^ d[2] ^ d[1] ^ d[0] ^ c[1] ^
-            c[2],
-            d[35] ^ d[32] ^ d[31] ^ d[30] ^ d[28] ^ d[25] ^ d[24] ^ d[23] ^ d[21] ^ d[18] ^ d[17] ^
-            d[16] ^ d[14] ^ d[11] ^ d[10] ^ d[9] ^ d[7] ^ d[4] ^ d[3] ^ d[2] ^ d[0] ^ c[1]
-        };
-    endfunction : calculate_out_crc
-
 
 endmodule : alu_tb
