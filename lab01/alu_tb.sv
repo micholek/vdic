@@ -44,8 +44,8 @@ module alu_tb;
         reset_alu();
 
         repeat(1000) begin
-            A = 10;
-            B = 20;
+            A = generate_operand();
+            B = generate_operand();
             operation = generate_operation();
 
             in_packets = create_in_packets(A, B, operation);
@@ -114,6 +114,19 @@ module alu_tb;
     function bit [2:0] generate_operation();
         return 3'($random);
     endfunction : generate_operation
+
+    function int generate_operand();
+        int operand;
+        automatic bit randomize_res = std::randomize(operand) with {
+            operand dist { 0 := 1, [1:32'hfffffffe] :/ 2, 32'hffffffff := 1 };
+        };
+        assert(randomize_res === 1'b1)
+        else begin
+            $display("Generating random operand failed");
+            test_result = "FAILED";
+        end
+        return operand;
+    endfunction : generate_operand
 
     task reset_alu();
         sin = 1'b1;
