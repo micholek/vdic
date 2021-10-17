@@ -21,7 +21,7 @@ module alu_tb;
 
     int A;
     int B;
-    operation_t operation;
+    bit [2:0] operation;
     in_packets_t in_packets;
 
     string test_result = "PASSED";
@@ -111,10 +111,8 @@ module alu_tb;
         $display("Test %s", test_result);
     end
 
-    function operation_t generate_operation();
-        operation_t operation;
-        $cast(operation, {1'($random), 1'b0, 1'($random)});
-        return operation;
+    function bit [2:0] generate_operation();
+        return 3'($random);
     endfunction : generate_operation
 
     task reset_alu();
@@ -136,7 +134,7 @@ module alu_tb;
         return {2'b01, payload, 1'b1};
     endfunction : create_cmd_packet
 
-    function in_packets_t create_in_packets(int X, int Y, operation_t operation);
+    function in_packets_t create_in_packets(int X, int Y, bit [2:0] operation);
         automatic in_crc_t crc = calculate_in_crc(X, Y, operation);
         return {
             create_data_packet(X[31:24]),
@@ -151,7 +149,7 @@ module alu_tb;
         };
     endfunction : create_in_packets
 
-    function in_crc_t calculate_in_crc(int X, int Y, operation_t operation);
+    function in_crc_t calculate_in_crc(int X, int Y, bit [2:0] operation);
         automatic bit [67:0] d = {X, Y, 1'b1, operation};
         static in_crc_t c = 0;
         return {
