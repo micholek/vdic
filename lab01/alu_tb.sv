@@ -23,6 +23,7 @@ module alu_tb;
     int B;
     bit [2:0] operation;
     in_packets_t in_packets;
+    bit should_reset_alu;
 
     string test_result = "PASSED";
 
@@ -47,8 +48,12 @@ module alu_tb;
             A = generate_operand();
             B = generate_operand();
             operation = generate_operation();
-
+            should_reset_alu = generate_reset_alu();
             in_packets = create_in_packets(A, B, operation);
+            if (should_reset_alu) begin
+                reset_alu();
+            end
+
             foreach (in_packets[i,j]) begin : tester_send_packet
                 @(negedge clk);
                 sin = in_packets[i][j];
@@ -127,6 +132,19 @@ module alu_tb;
         end
         return operand;
     endfunction : generate_operand
+
+    function bit generate_reset_alu();
+        bit should_reset;
+        automatic bit randomize_res = std::randomize(should_reset) with {
+            should_reset dist { 0 := 3, 1 := 1 };
+        };
+        assert(randomize_res === 1'b1)
+        else begin
+            $display("Generating reset failed");
+            test_result = "FAILED";
+        end
+        return should_reset;
+    endfunction : generate_reset_alu
 
     task reset_alu();
         sin = 1'b1;
