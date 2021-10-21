@@ -24,6 +24,8 @@ module alu_tb;
     bit [2:0] operation;
     in_packets_t in_packets;
     bit should_reset_alu;
+    bit [2:0] removed_packets_from_A;
+    bit [2:0] removed_packets_from_B;
 
     string test_result = "PASSED";
 
@@ -45,11 +47,14 @@ module alu_tb;
         reset_alu();
 
         repeat(1000) begin
-            A = generate_operand();
-            B = generate_operand();
+            removed_packets_from_A = generate_removed_packets_number();
+            removed_packets_from_B = generate_removed_packets_number();
+            A = generate_operand(removed_packets_from_A);
+            B = generate_operand(removed_packets_from_B);
             operation = generate_operation();
             should_reset_alu = generate_reset_alu();
-            in_packets = create_in_packets(A, B, operation);
+            in_packets = create_in_packets(A, B, operation, removed_packets_from_A,
+                removed_packets_from_B);
             if (should_reset_alu) begin
                 reset_alu();
             end
@@ -69,16 +74,28 @@ module alu_tb;
                     in_stream[52-:8], in_stream[41-:8], in_stream[30-:8], in_stream[19-:8]
                 };
                 automatic byte actual_cmd_payload = in_stream[8-:8];
-                assert({in_stream[98], in_stream[87], in_stream[76], in_stream[65], in_stream[54],
-                            in_stream[43], in_stream[32], in_stream[21], in_stream[10]}
-                        === 9'b000000000)
+                assert(in_stream[98] === removed_packets_from_A > 0 ? 1'b1 : 1'b0 &&
+                        in_stream[87] === removed_packets_from_A > 1 ? 1'b1 : 1'b0 &&
+                        in_stream[76] === removed_packets_from_A > 2 ? 1'b1 : 1'b0 &&
+                        in_stream[65] === removed_packets_from_A > 3 ? 1'b1 : 1'b0 &&
+                        in_stream[54] === removed_packets_from_B > 0 ? 1'b1 : 1'b0 &&
+                        in_stream[43] === removed_packets_from_B > 1 ? 1'b1 : 1'b0 &&
+                        in_stream[32] === removed_packets_from_B > 2 ? 1'b1 : 1'b0 &&
+                        in_stream[21] === removed_packets_from_B > 3 ? 1'b1 : 1'b0 &&
+                        in_stream[10] === 1'b0)
                 else begin
                     $display("Invalid first bits of packets");
                     test_result = "FAILED";
                 end
-                assert({in_stream[97], in_stream[86], in_stream[75], in_stream[64], in_stream[53],
-                            in_stream[42], in_stream[31], in_stream[20], in_stream[9]}
-                        === 9'b000000001)
+                assert(in_stream[97] === removed_packets_from_A > 0 ? 1'b1 : 1'b0 &&
+                        in_stream[86] === removed_packets_from_A > 1 ? 1'b1 : 1'b0 &&
+                        in_stream[75] === removed_packets_from_A > 2 ? 1'b1 : 1'b0 &&
+                        in_stream[64] === removed_packets_from_A > 3 ? 1'b1 : 1'b0 &&
+                        in_stream[53] === removed_packets_from_B > 0 ? 1'b1 : 1'b0 &&
+                        in_stream[42] === removed_packets_from_B > 1 ? 1'b1 : 1'b0 &&
+                        in_stream[31] === removed_packets_from_B > 2 ? 1'b1 : 1'b0 &&
+                        in_stream[20] === removed_packets_from_B > 3 ? 1'b1 : 1'b0 &&
+                        in_stream[9] === 1'b1)
                 else begin
                     $display("Invalid second bits of packets");
                     test_result = "FAILED";
@@ -120,7 +137,7 @@ module alu_tb;
         return 3'($random);
     endfunction : generate_operation
 
-    function int generate_operand();
+    function int generate_operand(bit [2:0] removed_packets);
         int operand;
         automatic bit randomize_res = std::randomize(operand) with {
             operand dist { 0 := 1, [1:32'hfffffffe] :/ 2, 32'hffffffff := 1 };
@@ -129,6 +146,18 @@ module alu_tb;
         else begin
             $display("Generating random operand failed");
             test_result = "FAILED";
+        end
+        if (removed_packets > 0) begin
+            operand[31-:8] = 8'b11111111;
+        end
+        if (removed_packets > 1) begin
+            operand[23-:8] = 8'b11111111;
+        end
+        if (removed_packets > 2) begin
+            operand[15-:8] = 8'b11111111;
+        end
+        if (removed_packets > 3) begin
+            operand[7-:8] = 8'b11111111;
         end
         return operand;
     endfunction : generate_operand
@@ -145,6 +174,19 @@ module alu_tb;
         end
         return should_reset;
     endfunction : generate_reset_alu
+
+    function bit [2:0] generate_removed_packets_number();
+        bit [2:0] removed_packets_number;
+        automatic bit randomize_res = std::randomize(removed_packets_number) with {
+            removed_packets_number dist { 0 := 4, [1:4] :/ 1 };
+        };
+        assert(randomize_res === 1'b1)
+        else begin
+            $display("Generating number of packets to remove failed");
+            test_result = "FAILED";
+        end
+        return removed_packets_number;
+    endfunction : generate_removed_packets_number
 
     task reset_alu();
         sin = 1'b1;
@@ -165,17 +207,18 @@ module alu_tb;
         return {2'b01, payload, 1'b1};
     endfunction : create_cmd_packet
 
-    function in_packets_t create_in_packets(int X, int Y, bit [2:0] operation);
+    function in_packets_t create_in_packets(int X, int Y, bit [2:0] operation,
+            bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y);
         automatic in_crc_t crc = calculate_in_crc(X, Y, operation);
         return {
-            create_data_packet(X[31:24]),
-            create_data_packet(X[23:16]),
-            create_data_packet(X[15:8]),
-            create_data_packet(X[7:0]),
-            create_data_packet(Y[31:24]),
-            create_data_packet(Y[23:16]),
-            create_data_packet(Y[15:8]),
-            create_data_packet(Y[7:0]),
+            removed_packets_from_X > 0 ? 11'b11111111111 : create_data_packet(X[31:24]),
+            removed_packets_from_X > 1 ? 11'b11111111111 : create_data_packet(X[23:16]),
+            removed_packets_from_X > 2 ? 11'b11111111111 : create_data_packet(X[15:8]),
+            removed_packets_from_X > 3 ? 11'b11111111111 : create_data_packet(X[7:0]),
+            removed_packets_from_Y > 0 ? 11'b11111111111 : create_data_packet(Y[31:24]),
+            removed_packets_from_Y > 1 ? 11'b11111111111 : create_data_packet(Y[23:16]),
+            removed_packets_from_Y > 2 ? 11'b11111111111 : create_data_packet(Y[15:8]),
+            removed_packets_from_Y > 3 ? 11'b11111111111 : create_data_packet(Y[7:0]),
             create_cmd_packet({1'b0, operation, crc})
         };
     endfunction : create_in_packets
