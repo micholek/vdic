@@ -1,0 +1,9 @@
+*
+!.gitignore
+!Makefile
+!alu_tb.sv
+!dut.f
+!mtm_Alu.vp
+!run_xrun.sh
+!tb.f
+!xrun_covfile.txt
