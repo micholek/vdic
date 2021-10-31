@@ -7,6 +7,11 @@ module alu_tb;
         SUB_OPERATION = 3'b101
     } operation_t;
 
+    typedef enum bit {
+        RESET_ACTION = 0,
+        OPERATION_ACTION = 1
+    } action_t;
+
     typedef bit [3:0] in_crc_t;
     typedef bit [2:0] out_crc_t;
 
@@ -23,9 +28,9 @@ module alu_tb;
     int B;
     bit [2:0] operation;
     in_packets_t in_packets;
-    bit should_reset_alu;
     bit [2:0] removed_packets_from_A;
     bit [2:0] removed_packets_from_B;
+    action_t action;
 
     string test_result = "PASSED";
 
@@ -47,17 +52,19 @@ module alu_tb;
         reset_alu();
 
         repeat(1000) begin
+            action = generate_action();
+            if (action === RESET_ACTION) begin
+                reset_alu();
+                continue;
+            end
+
             removed_packets_from_A = generate_removed_packets_number();
             removed_packets_from_B = generate_removed_packets_number();
             A = generate_operand(removed_packets_from_A);
             B = generate_operand(removed_packets_from_B);
             operation = generate_operation();
-            should_reset_alu = generate_reset_alu();
             in_packets = create_in_packets(A, B, operation, removed_packets_from_A,
                 removed_packets_from_B);
-            if (should_reset_alu) begin
-                reset_alu();
-            end
 
             foreach (in_packets[i,j]) begin : tester_send_packet
                 @(negedge clk);
@@ -133,6 +140,19 @@ module alu_tb;
         $display("Test %s", test_result);
     end
 
+    function action_t generate_action();
+        action_t action;
+        automatic bit randomize_res = std::randomize(action) with {
+            action dist { RESET_ACTION := 1, OPERATION_ACTION := 3 };
+        };
+        assert(randomize_res === 1'b1)
+        else begin
+            $display("Generating action failed");
+            test_result = "FAILED";
+        end
+        return action;
+    endfunction : generate_action
+
     function bit [2:0] generate_operation();
         return 3'($random);
     endfunction : generate_operation
@@ -161,19 +181,6 @@ module alu_tb;
         end
         return operand;
     endfunction : generate_operand
-
-    function bit generate_reset_alu();
-        bit should_reset;
-        automatic bit randomize_res = std::randomize(should_reset) with {
-            should_reset dist { 0 := 3, 1 := 1 };
-        };
-        assert(randomize_res === 1'b1)
-        else begin
-            $display("Generating reset failed");
-            test_result = "FAILED";
-        end
-        return should_reset;
-    endfunction : generate_reset_alu
 
     function bit [2:0] generate_removed_packets_number();
         bit [2:0] removed_packets_number;
