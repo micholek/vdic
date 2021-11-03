@@ -12,12 +12,34 @@ module alu_tb;
         OPERATION_ACTION = 1
     } action_t;
 
+    typedef struct packed {
+        bit carry;
+        bit overflow;
+        bit zero;
+        bit negative;
+    } flags_t;
+
+    typedef struct packed {
+        bit data;
+        bit crc;
+        bit op;
+    } error_flags_t;
+
+    typedef struct packed {
+        int C;
+        flags_t flags;
+        error_flags_t error_flags;
+        bit [2:0] crc;
+        bit parity;
+    } alu_output_t;
+
     typedef bit [3:0] in_crc_t;
     typedef bit [2:0] out_crc_t;
 
     typedef bit [10:0] packet_t;
 
     typedef packet_t[0:8] in_packets_t;
+    typedef packet_t[0:4] out_packets_t;
 
     bit clk;
     bit rst_n;
@@ -31,6 +53,12 @@ module alu_tb;
     bit [2:0] removed_packets_from_A;
     bit [2:0] removed_packets_from_B;
     action_t action;
+
+    bit data_sent;
+
+    packet_t out_error_packet;
+    out_packets_t out_success_packets;
+    alu_output_t alu_output;
 
     string test_result = "PASSED";
 
@@ -52,6 +80,7 @@ module alu_tb;
         reset_alu();
 
         repeat(1000) begin
+            wait(data_sent === 1'b0);
             action = generate_action();
             if (action === RESET_ACTION) begin
                 reset_alu();
@@ -70,71 +99,68 @@ module alu_tb;
                 @(negedge clk);
                 sin = in_packets[i][j];
             end
-
-            begin : tester_temp_check
-                // Temporary checking if the structure of data stream is correct.
-                automatic bit [98:0] in_stream = in_packets;
-                automatic int actual_A = {
-                    in_stream[96-:8], in_stream[85-:8], in_stream[74-:8], in_stream[63-:8]
-                };
-                automatic int actual_B = {
-                    in_stream[52-:8], in_stream[41-:8], in_stream[30-:8], in_stream[19-:8]
-                };
-                automatic byte actual_cmd_payload = in_stream[8-:8];
-                assert(in_stream[98] === removed_packets_from_A > 0 ? 1'b1 : 1'b0 &&
-                        in_stream[87] === removed_packets_from_A > 1 ? 1'b1 : 1'b0 &&
-                        in_stream[76] === removed_packets_from_A > 2 ? 1'b1 : 1'b0 &&
-                        in_stream[65] === removed_packets_from_A > 3 ? 1'b1 : 1'b0 &&
-                        in_stream[54] === removed_packets_from_B > 0 ? 1'b1 : 1'b0 &&
-                        in_stream[43] === removed_packets_from_B > 1 ? 1'b1 : 1'b0 &&
-                        in_stream[32] === removed_packets_from_B > 2 ? 1'b1 : 1'b0 &&
-                        in_stream[21] === removed_packets_from_B > 3 ? 1'b1 : 1'b0 &&
-                        in_stream[10] === 1'b0)
-                else begin
-                    $display("Invalid first bits of packets");
-                    test_result = "FAILED";
-                end
-                assert(in_stream[97] === removed_packets_from_A > 0 ? 1'b1 : 1'b0 &&
-                        in_stream[86] === removed_packets_from_A > 1 ? 1'b1 : 1'b0 &&
-                        in_stream[75] === removed_packets_from_A > 2 ? 1'b1 : 1'b0 &&
-                        in_stream[64] === removed_packets_from_A > 3 ? 1'b1 : 1'b0 &&
-                        in_stream[53] === removed_packets_from_B > 0 ? 1'b1 : 1'b0 &&
-                        in_stream[42] === removed_packets_from_B > 1 ? 1'b1 : 1'b0 &&
-                        in_stream[31] === removed_packets_from_B > 2 ? 1'b1 : 1'b0 &&
-                        in_stream[20] === removed_packets_from_B > 3 ? 1'b1 : 1'b0 &&
-                        in_stream[9] === 1'b1)
-                else begin
-                    $display("Invalid second bits of packets");
-                    test_result = "FAILED";
-                end
-                assert({in_stream[88], in_stream[77], in_stream[66], in_stream[55], in_stream[44],
-                            in_stream[33], in_stream[22], in_stream[11], in_stream[0]}
-                        === 9'b111111111)
-                else begin
-                    $display("Invalid last bits of packets");
-                    test_result = "FAILED";
-                end
-                assert(actual_A === A)
-                else begin
-                    $display("Invalid first operand (expected: %0d, actual: %0d", A, actual_A);
-                    test_result = "FAILED";
-                end
-                assert(actual_B === B)
-                else begin
-                    $display("Invalid second operand (expected: %0d, actual: %0d", B, actual_B);
-                    test_result = "FAILED";
-                end
-                assert(actual_cmd_payload === {1'b0, operation, calculate_in_crc(A, B, operation)})
-                else begin
-                    $display("Invalid cmd packet payload for A = %0d, B = %0d, op = %0d", A, B,
-                        operation, "(actual: %0h)", actual_cmd_payload);
-                    test_result = "FAILED";
-                end
-            end
+            data_sent = 1;
         end
 
         $finish;
     end
+
+    initial begin : scoreboard
+        forever begin
+            @(negedge sout);
+            if (data_sent) begin
+                alu_output = get_expected_output(
+                    A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                if (3'(alu_output.error_flags) !== 3'b000) begin
+                    foreach (out_error_packet[i]) begin
+                        @(negedge clk);
+                        out_error_packet[i] = sout;
+                    end
+                    assert(out_error_packet[7-:6] === {3'(alu_output.error_flags),
+                                3'(alu_output.error_flags)}) else begin
+                        $error("Test failed - invalid error flags (actual: %06b, expected: %06b)",
+                            out_error_packet[7-:6], {3'(alu_output.error_flags),
+                                3'(alu_output.error_flags)},
+                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                            A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                        test_result = "FAILED";
+                    end
+                    assert(out_error_packet[1] === alu_output.parity) else begin
+                        $error("Test failed - invalid parity bit (actual: %0d, expected: %0d)",
+                            out_error_packet[1], alu_output.parity,
+                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                            A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                        test_result = "FAILED";
+                    end
+                end else begin
+                    bit [54:0] out_stream;
+                    int actual_C;
+                    bit [3:0] actual_flags;
+                    foreach (out_success_packets[i,j]) begin
+                        @(negedge clk);
+                        out_success_packets[i][j] = sout;
+                    end
+                    out_stream = out_success_packets;
+                    actual_C = {out_stream[52-:8], out_stream[41-:8], out_stream[30-:8],
+                        out_stream[19-:8]};
+                    assert(actual_C === alu_output.C) else begin
+                        $error("Test failed - invalid result (actual: %0h, expected: %0h)",
+                            actual_C, alu_output.C,
+                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                            A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                    end
+                    actual_flags = out_success_packets[4][7-:4];
+                    assert(actual_flags === alu_output.flags) else begin
+                        $error("Test failed - invalid flags (actual %04b, expected: %04b)",
+                            actual_flags, alu_output.flags,
+                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                            A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                    end
+                end
+                data_sent = 0;
+            end
+        end
+    end : scoreboard
 
     final begin : finish_of_the_test
         $display("Test %s", test_result);
@@ -252,5 +278,55 @@ module alu_tb;
             d[4] ^ d[3] ^ d[0] ^ c[0] ^ c[2]
         };
     endfunction : calculate_in_crc
+
+    function alu_output_t get_expected_output(int X, int Y, bit [2:0] operation,
+            bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y);
+        operation_t op;
+        automatic alu_output_t out = 0;
+        automatic bit error_occured = 0;
+        automatic bit [32:0] aux_buffer = 33'b0;
+        if (removed_packets_from_X > 0 || removed_packets_from_Y > 0) begin
+            out.error_flags.data = 1;
+            error_occured = 1;
+        end else if ($cast(op, operation) === 0) begin
+            out.error_flags.op = 1;
+            error_occured = 1;
+        end
+        if (error_occured) begin
+            out.parity = ~(^{1'b1, out.error_flags});
+        end else begin
+            case (op)
+                AND_OPERATION: begin
+                    out.C = X & Y;
+                end
+                OR_OPERATION: begin
+                    out.C = X | Y;
+                end
+                ADD_OPERATION: begin
+                    aux_buffer = {1'b0, X} + {1'b0, Y};
+                    out.C = X + Y;
+                    out.flags.overflow = ~(X[31] ^ Y[31]) & (X[31] ^ out.C[31]);
+                end
+                SUB_OPERATION: begin
+                    aux_buffer = {1'b0, X} - {1'b0, Y};
+                    out.C = X - Y;
+                    out.flags.overflow = (X[31] ^ Y[31]) & (X[31] ^ out.C[31]);
+                end
+                default: begin
+                    assert(0) else begin
+                        $error("Unreachable - unexpected operation");
+                        test_result = "FAILED";
+                        $finish;
+                    end
+                end
+            endcase
+            out.flags.carry = aux_buffer[32] === 1'b1;
+            out.flags.negative = out.C < 0;
+            out.flags.zero = out.C === 0;
+            out.error_flags = 3'b000;
+        end
+
+        return out;
+    endfunction : get_expected_output
 
 endmodule : alu_tb
