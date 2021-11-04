@@ -6,6 +6,7 @@ module alu_tb;
         ADD_OPERATION = 3'b100,
         SUB_OPERATION = 3'b101
     } operation_t;
+    `define ALL_OPERATIONS [AND_OPERATION : SUB_OPERATION]
 
     typedef enum bit {
         RESET_ACTION = 0,
@@ -26,7 +27,7 @@ module alu_tb;
     } error_flags_t;
 
     typedef struct packed {
-        int C;
+        bit [31:0] C;
         flags_t flags;
         error_flags_t error_flags;
         bit [2:0] crc;
@@ -46,8 +47,8 @@ module alu_tb;
     bit sin;
     wire sout;
 
-    int A;
-    int B;
+    bit [31:0] A;
+    bit [31:0] B;
     bit [2:0] operation;
     in_packets_t in_packets;
     bit [2:0] removed_packets_from_A;
@@ -75,6 +76,118 @@ module alu_tb;
             #10 clk = ~clk;
         end
     end
+
+    covergroup operation_cov;
+        option.name = "cg_operation_cov";
+
+        cp_operation : coverpoint operation {
+            bins A1_operations[] = {`ALL_OPERATIONS};
+            bins A2_operation_after_operation[] = (`ALL_OPERATIONS => `ALL_OPERATIONS);
+            bins A3_two_operations_in_row[] = (`ALL_OPERATIONS [* 2]);
+        }
+
+        cp_action : coverpoint action {
+            bins reset_after_operation = (OPERATION_ACTION => RESET_ACTION);
+            bins operation_after_reset = (RESET_ACTION => OPERATION_ACTION);
+        }
+
+        cross_operation_action : cross cp_operation, cp_action {
+            bins A4_reset_after_and = binsof(cp_operation.A1_operations) intersect {AND_OPERATION}
+            && binsof(cp_action.reset_after_operation);
+            bins A4_reset_after_or = binsof(cp_operation.A1_operations) intersect {OR_OPERATION}
+            && binsof(cp_action.reset_after_operation);
+            bins A4_reset_after_add = binsof(cp_operation.A1_operations) intersect {ADD_OPERATION}
+            && binsof(cp_action.reset_after_operation);
+            bins A4_reset_after_sub = binsof(cp_operation.A1_operations) intersect {SUB_OPERATION}
+            && binsof(cp_action.reset_after_operation);
+            bins A5_and_after_reset = binsof(cp_operation.A1_operations) intersect {AND_OPERATION}
+            && binsof(cp_action.operation_after_reset);
+            bins A5_or_after_reset = binsof(cp_operation.A1_operations) intersect {OR_OPERATION}
+            && binsof(cp_action.operation_after_reset);
+            bins A5_add_after_reset = binsof(cp_operation.A1_operations) intersect {ADD_OPERATION}
+            && binsof(cp_action.operation_after_reset);
+            bins A5_sub_after_reset = binsof(cp_operation.A1_operations) intersect {SUB_OPERATION}
+            && binsof(cp_action.operation_after_reset);
+            ignore_bins operation_combinations = binsof(cp_operation.A2_operation_after_operation)
+            || binsof(cp_operation.A3_two_operations_in_row);
+        }
+    endgroup : operation_cov
+
+    covergroup data_cov;
+        option.name = "cg_data_cov";
+
+        cp_operation : coverpoint operation {
+            wildcard ignore_bins invalid_operations = {3'b?1?};
+        }
+
+        cp_A : coverpoint A {
+            bins min = {'h00000000};
+            bins others = {['h00000001 : 'hfffffffe]};
+            bins max = {'hffffffff};
+        }
+
+        cp_B : coverpoint B {
+            bins min = {'h00000000};
+            bins others = {['h00000001 : 'hfffffffe]};
+            bins max = {'hffffffff};
+        }
+
+        cross_operation_A_B : cross cp_operation, cp_A, cp_B {
+            bins B1_and_min = binsof(cp_operation) intersect {AND_OPERATION} &&
+            (binsof(cp_A.min) || binsof(cp_B.min));
+            bins B1_or_min = binsof(cp_operation) intersect{OR_OPERATION} &&
+            (binsof(cp_A.min) || binsof(cp_B.min));
+            bins B1_add_min = binsof(cp_operation) intersect {ADD_OPERATION} &&
+            (binsof(cp_A.min) || binsof(cp_B.min));
+            bins B1_sub_min = binsof(cp_operation) intersect {SUB_OPERATION} &&
+            (binsof(cp_A.min) || binsof(cp_B.min));
+
+            bins B2_and_max = binsof(cp_operation) intersect {AND_OPERATION} &&
+            (binsof(cp_A.max) || binsof(cp_B.max));
+            bins B2_or_max = binsof(cp_operation) intersect {OR_OPERATION} &&
+            (binsof(cp_A.max) || binsof(cp_B.max));
+            bins B2_add_max = binsof(cp_operation) intersect {ADD_OPERATION} &&
+            (binsof(cp_A.max) || binsof(cp_B.max));
+            bins B2_sub_max = binsof(cp_operation) intersect {SUB_OPERATION} &&
+            (binsof(cp_A.max) || binsof(cp_B.max));
+
+            ignore_bins others = binsof(cp_A.others) && binsof(cp_B.others);
+        }
+    endgroup : data_cov
+
+    covergroup error_cov;
+        option.name = "cg_error_cov";
+
+        cp_removed_packets_from_A : coverpoint removed_packets_from_A {
+            bins C1_removed_packets[] = {[0 : 4]};
+        }
+
+        cp_removed_packets_from_B : coverpoint removed_packets_from_B {
+            bins C1_removed_packets[] = {[0 : 4]};
+        }
+
+        cp_operation : coverpoint operation {
+            wildcard ignore_bins C2_all_operations = {3'b?0?};
+        }
+    endgroup : error_cov
+
+    operation_cov operation_c;
+    data_cov data_c;
+    error_cov error_c;
+
+    initial begin : coverage
+        operation_c = new();
+        data_c = new();
+        error_c = new();
+        forever begin
+            @(posedge clk);
+            if (data_sent || !rst_n) begin
+                operation_c.sample();
+                data_c.sample();
+                error_c.sample();
+            end
+        end
+    end : coverage
 
     initial begin : tester
         reset_alu();
@@ -134,7 +247,7 @@ module alu_tb;
                     end
                 end else begin
                     bit [54:0] out_stream;
-                    int actual_C;
+                    bit [31:0] actual_C;
                     bit [3:0] actual_flags;
                     foreach (out_success_packets[i,j]) begin
                         @(negedge clk);
@@ -183,8 +296,8 @@ module alu_tb;
         return 3'($random);
     endfunction : generate_operation
 
-    function int generate_operand(bit [2:0] removed_packets);
-        int operand;
+    function bit [31:0] generate_operand(bit [2:0] removed_packets);
+        bit [31:0] operand;
         automatic bit randomize_res = std::randomize(operand) with {
             operand dist { 0 := 1, [1:32'hfffffffe] :/ 2, 32'hffffffff := 1 };
         };
@@ -240,7 +353,7 @@ module alu_tb;
         return {2'b01, payload, 1'b1};
     endfunction : create_cmd_packet
 
-    function in_packets_t create_in_packets(int X, int Y, bit [2:0] operation,
+    function in_packets_t create_in_packets(bit [31:0] X, bit [31:0] Y, bit [2:0] operation,
             bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y);
         automatic in_crc_t crc = calculate_in_crc(X, Y, operation);
         return {
@@ -256,7 +369,7 @@ module alu_tb;
         };
     endfunction : create_in_packets
 
-    function in_crc_t calculate_in_crc(int X, int Y, bit [2:0] operation);
+    function in_crc_t calculate_in_crc(bit [31:0] X, bit [31:0] Y, bit [2:0] operation);
         automatic bit [67:0] d = {X, Y, 1'b1, operation};
         static in_crc_t c = 0;
         return {
@@ -279,7 +392,7 @@ module alu_tb;
         };
     endfunction : calculate_in_crc
 
-    function alu_output_t get_expected_output(int X, int Y, bit [2:0] operation,
+    function alu_output_t get_expected_output(bit [31:0] X, bit [31:0] Y, bit [2:0] operation,
             bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y);
         operation_t op;
         automatic alu_output_t out = 0;
@@ -313,15 +426,13 @@ module alu_tb;
                     out.flags.overflow = (X[31] ^ Y[31]) & (X[31] ^ out.C[31]);
                 end
                 default: begin
-                    assert(0) else begin
-                        $error("Unreachable - unexpected operation");
-                        test_result = "FAILED";
-                        $finish;
-                    end
+                    $error("Unreachable - unexpected operation");
+                    test_result = "FAILED";
+                    $finish;
                 end
             endcase
             out.flags.carry = aux_buffer[32] === 1'b1;
-            out.flags.negative = out.C < 0;
+            out.flags.negative = out.C[31] === 1'b1;
             out.flags.zero = out.C === 0;
             out.error_flags = 3'b000;
         end
