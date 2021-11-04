@@ -2,6 +2,7 @@
 !.gitignore
 !Makefile
 !alu_tb.sv
+!alu_test_spec.pdf
 !dut.f
 !mtm_Alu.vp
 !run_xrun.sh
