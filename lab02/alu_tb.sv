@@ -259,6 +259,7 @@ module alu_tb;
                 bit [54:0] out_stream;
                 bit [31:0] actual_C;
                 bit [3:0] actual_flags;
+                out_crc_t actual_crc;
                 foreach (out_success_packets[i,j]) begin
                     @(negedge clk);
                     out_success_packets[i][j] = sout;
@@ -276,6 +277,13 @@ module alu_tb;
                 assert(actual_flags === alu_output.flags) else begin
                     $error("Test failed - invalid flags (actual %04b, expected: %04b)",
                         actual_flags, alu_output.flags,
+                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                        A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                end
+                actual_crc = out_success_packets[4][3-:$bits(out_crc_t)];
+                assert(actual_crc === alu_output.crc) else begin
+                    $error("Test failed - invalid CRC (actual %03b, expected: %03b)",
+                        actual_crc, alu_output.crc,
                         "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
                         A, B, operation, removed_packets_from_A, removed_packets_from_B);
                 end
@@ -421,6 +429,20 @@ module alu_tb;
         };
     endfunction : calculate_in_crc
 
+    function out_crc_t calculate_out_crc(bit [31:0] op_result, bit [3:0] out_flags);
+        automatic bit [36:0] d = {op_result, 1'b0, out_flags};
+        static out_crc_t c = 0;
+        return {
+            d[36] ^ d[34] ^ d[31] ^ d[30] ^ d[29] ^ d[27] ^ d[24] ^ d[23] ^ d[22] ^ d[20] ^ d[17] ^
+            d[16] ^ d[15] ^ d[13] ^ d[10] ^ d[9] ^ d[8] ^ d[6] ^ d[3] ^ d[2] ^ d[1] ^ c[0] ^ c[2],
+            d[36] ^ d[35] ^ d[33] ^ d[30] ^ d[29] ^ d[28] ^ d[26] ^ d[23] ^ d[22] ^ d[21] ^ d[19] ^
+            d[16] ^ d[15] ^ d[14] ^ d[12] ^ d[9] ^ d[8] ^ d[7] ^ d[5] ^ d[2] ^ d[1] ^ d[0] ^ c[1] ^
+            c[2],
+            d[35] ^ d[32] ^ d[31] ^ d[30] ^ d[28] ^ d[25] ^ d[24] ^ d[23] ^ d[21] ^ d[18] ^ d[17] ^
+            d[16] ^ d[14] ^ d[11] ^ d[10] ^ d[9] ^ d[7] ^ d[4] ^ d[3] ^ d[2] ^ d[0] ^ c[1]
+        };
+    endfunction : calculate_out_crc
+
     function alu_output_t get_expected_output(bit [31:0] X, bit [31:0] Y, bit [2:0] operation,
             bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y);
         operation_t op;
@@ -466,6 +488,7 @@ module alu_tb;
             out.flags.carry = aux_buffer[32] === 1'b1;
             out.flags.negative = out.C[31] === 1'b1;
             out.flags.zero = out.C === 0;
+            out.crc = calculate_out_crc(out.C, out.flags);
             out.error_flags = 3'b000;
         end
 
