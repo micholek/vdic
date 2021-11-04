@@ -435,7 +435,7 @@ module alu_tb;
             error_occured = 1;
         end
         if (error_occured) begin
-            out.parity = ~(^{1'b1, out.error_flags});
+            out.parity = ^{1'b1, out.error_flags, out.error_flags};
         end else begin
             case (op)
                 AND_OPERATION: begin
