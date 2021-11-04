@@ -69,6 +69,7 @@ module alu_tb;
 
     string test_result = "PASSED";
 
+
     mtm_Alu DUT(
         .clk,
         .rst_n,
@@ -76,12 +77,14 @@ module alu_tb;
         .sout
     );
 
+
     initial begin : clk_gen
         clk = 0;
         forever begin : clk_frv
             #10 clk = ~clk;
         end
     end
+
 
     covergroup operation_cov;
         option.name = "cg_operation_cov";
@@ -177,7 +180,7 @@ module alu_tb;
         }
 
         cp_should_randomize_crc : coverpoint should_randomize_crc {
-            bins C3_random_crc = {1};
+            bins C3_random_crc[] = {0, 1};
         }
     endgroup : error_cov
 
@@ -198,6 +201,7 @@ module alu_tb;
             end
         end
     end : coverage
+
 
     initial begin : tester
         reset_alu();
@@ -223,23 +227,25 @@ module alu_tb;
                 sin = in_packets[i][j];
             end
             tb_state = SCORE_AND_COV_STATE;
+            
         end
 
         $finish;
     end
+
 
     initial begin : scoreboard
         forever begin
             @(negedge sout);
             alu_output = get_expected_output(
                 A, B, operation, removed_packets_from_A, removed_packets_from_B);
-            if (3'(alu_output.error_flags) !== 3'b000) begin
+            if (alu_output.error_flags !== error_flags_t'(0)) begin
                 foreach (out_error_packet[i]) begin
                     @(negedge clk);
                     out_error_packet[i] = sout;
                 end
-                assert(out_error_packet[7-:6] === {3'(alu_output.error_flags),
-                            3'(alu_output.error_flags)}) else begin
+                assert(out_error_packet[7-:2*$bits(error_flags_t)] === {alu_output.error_flags,
+                            alu_output.error_flags}) else begin
                     $error("Test failed - invalid error flags (actual: %06b, expected: %06b)",
                         out_error_packet[7-:6], {3'(alu_output.error_flags),
                             3'(alu_output.error_flags)},
@@ -258,7 +264,7 @@ module alu_tb;
             end else begin
                 bit [54:0] out_stream;
                 bit [31:0] actual_C;
-                bit [3:0] actual_flags;
+                flags_t actual_flags;
                 out_crc_t actual_crc;
                 foreach (out_success_packets[i,j]) begin
                     @(negedge clk);
@@ -273,7 +279,7 @@ module alu_tb;
                         "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
                         A, B, operation, removed_packets_from_A, removed_packets_from_B);
                 end
-                actual_flags = out_success_packets[4][7-:4];
+                actual_flags = out_success_packets[4][7-:$bits(flags_t)];
                 assert(actual_flags === alu_output.flags) else begin
                     $error("Test failed - invalid flags (actual %04b, expected: %04b)",
                         actual_flags, alu_output.flags,
@@ -292,9 +298,13 @@ module alu_tb;
         end
     end : scoreboard
 
+
     final begin : finish_of_the_test
         $display("Test %s", test_result);
     end
+
+
+    // Tester utilities.
 
     function action_t generate_action();
         action_t action;
@@ -371,10 +381,6 @@ module alu_tb;
         rst_n = 1'b1;
     endtask : reset_alu
 
-    function bit is_cmd_packet(packet_t packet);
-        return packet[9] == 1'b1;
-    endfunction : is_cmd_packet
-
     function packet_t create_data_packet(byte payload);
         return {2'b00, payload, 1'b1};
     endfunction : create_data_packet
@@ -429,6 +435,9 @@ module alu_tb;
         };
     endfunction : calculate_in_crc
 
+
+    // Scoreboard utilities.
+
     function out_crc_t calculate_out_crc(bit [31:0] op_result, bit [3:0] out_flags);
         automatic bit [36:0] d = {op_result, 1'b0, out_flags};
         static out_crc_t c = 0;
@@ -446,20 +455,16 @@ module alu_tb;
     function alu_output_t get_expected_output(bit [31:0] X, bit [31:0] Y, bit [2:0] operation,
             bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y);
         operation_t op;
-        automatic alu_output_t out = 0;
-        automatic bit error_occured = 0;
+        automatic alu_output_t out = alu_output_t'(0);
         automatic bit [32:0] aux_buffer = 33'b0;
         if (removed_packets_from_X > 0 || removed_packets_from_Y > 0) begin
             out.error_flags.data = 1;
-            error_occured = 1;
         end else if (should_randomize_crc === 1) begin
             out.error_flags.crc = 1;
-            error_occured = 1;
         end else if ($cast(op, operation) === 0) begin
             out.error_flags.op = 1;
-            error_occured = 1;
         end
-        if (error_occured) begin
+        if (out.error_flags != error_flags_t'(0)) begin
             out.parity = ^{1'b1, out.error_flags, out.error_flags};
         end else begin
             case (op)
