@@ -54,6 +54,7 @@ module alu_tb;
     bit [2:0] removed_packets_from_A;
     bit [2:0] removed_packets_from_B;
     action_t action;
+    bit should_randomize_crc;
 
     bit data_sent;
 
@@ -169,6 +170,10 @@ module alu_tb;
         cp_operation : coverpoint operation {
             wildcard ignore_bins C2_all_operations = {3'b?0?};
         }
+
+        cp_should_randomize_crc : coverpoint should_randomize_crc {
+            bins C3_random_crc = {1};
+        }
     endgroup : error_cov
 
     operation_cov operation_c;
@@ -234,8 +239,9 @@ module alu_tb;
                         $error("Test failed - invalid error flags (actual: %06b, expected: %06b)",
                             out_error_packet[7-:6], {3'(alu_output.error_flags),
                                 3'(alu_output.error_flags)},
-                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                            A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d, ",
+                            A, B, operation, removed_packets_from_A, removed_packets_from_B,
+                            "random CRC = %0d)", should_randomize_crc);
                         test_result = "FAILED";
                     end
                     assert(out_error_packet[1] === alu_output.parity) else begin
@@ -334,6 +340,19 @@ module alu_tb;
         return removed_packets_number;
     endfunction : generate_removed_packets_number
 
+    function bit generate_should_randomize_crc();
+        bit should_randomize;
+        automatic bit randomize_res = std::randomize(should_randomize) with {
+            should_randomize dist { 0 := 3, 1 := 1 };
+        };
+        assert(randomize_res === 1'b1)
+        else begin
+            $display("Generating crc randomize flag failed");
+            test_result = "FAILED";
+        end
+        return should_randomize;
+    endfunction : generate_should_randomize_crc
+
     task reset_alu();
         sin = 1'b1;
         rst_n = 1'b0;
@@ -355,7 +374,14 @@ module alu_tb;
 
     function in_packets_t create_in_packets(bit [31:0] X, bit [31:0] Y, bit [2:0] operation,
             bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y);
+        in_crc_t random_crc;
         automatic in_crc_t crc = calculate_in_crc(X, Y, operation);
+        should_randomize_crc = generate_should_randomize_crc();
+        if (should_randomize_crc) begin
+            do begin
+                random_crc = in_crc_t'($random);
+            end while (random_crc === crc);
+        end
         return {
             removed_packets_from_X > 0 ? 11'b11111111111 : create_data_packet(X[31:24]),
             removed_packets_from_X > 1 ? 11'b11111111111 : create_data_packet(X[23:16]),
@@ -365,7 +391,7 @@ module alu_tb;
             removed_packets_from_Y > 1 ? 11'b11111111111 : create_data_packet(Y[23:16]),
             removed_packets_from_Y > 2 ? 11'b11111111111 : create_data_packet(Y[15:8]),
             removed_packets_from_Y > 3 ? 11'b11111111111 : create_data_packet(Y[7:0]),
-            create_cmd_packet({1'b0, operation, crc})
+            create_cmd_packet({1'b0, operation, should_randomize_crc ? random_crc : crc})
         };
     endfunction : create_in_packets
 
@@ -400,6 +426,9 @@ module alu_tb;
         automatic bit [32:0] aux_buffer = 33'b0;
         if (removed_packets_from_X > 0 || removed_packets_from_Y > 0) begin
             out.error_flags.data = 1;
+            error_occured = 1;
+        end else if (should_randomize_crc === 1) begin
+            out.error_flags.crc = 1;
             error_occured = 1;
         end else if ($cast(op, operation) === 0) begin
             out.error_flags.op = 1;
