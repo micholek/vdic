@@ -1,5 +1,10 @@
 module alu_tb;
 
+    typedef enum bit {
+        TEST_STATE = 0,
+        SCORE_AND_COV_STATE = 1
+    } tb_state_t;
+
     typedef enum bit [2:0] {
         AND_OPERATION = 3'b000,
         OR_OPERATION = 3'b001,
@@ -56,7 +61,7 @@ module alu_tb;
     action_t action;
     bit should_randomize_crc;
 
-    bit data_sent;
+    tb_state_t tb_state;
 
     packet_t out_error_packet;
     out_packets_t out_success_packets;
@@ -186,7 +191,7 @@ module alu_tb;
         error_c = new();
         forever begin
             @(posedge clk);
-            if (data_sent || !rst_n) begin
+            if (tb_state === SCORE_AND_COV_STATE || !rst_n) begin
                 operation_c.sample();
                 data_c.sample();
                 error_c.sample();
@@ -198,7 +203,7 @@ module alu_tb;
         reset_alu();
 
         repeat(1000) begin
-            wait(data_sent === 1'b0);
+            wait(tb_state === TEST_STATE);
             action = generate_action();
             if (action === RESET_ACTION) begin
                 reset_alu();
@@ -217,7 +222,7 @@ module alu_tb;
                 @(negedge clk);
                 sin = in_packets[i][j];
             end
-            data_sent = 1;
+            tb_state = SCORE_AND_COV_STATE;
         end
 
         $finish;
@@ -226,58 +231,56 @@ module alu_tb;
     initial begin : scoreboard
         forever begin
             @(negedge sout);
-            if (data_sent) begin
-                alu_output = get_expected_output(
-                    A, B, operation, removed_packets_from_A, removed_packets_from_B);
-                if (3'(alu_output.error_flags) !== 3'b000) begin
-                    foreach (out_error_packet[i]) begin
-                        @(negedge clk);
-                        out_error_packet[i] = sout;
-                    end
-                    assert(out_error_packet[7-:6] === {3'(alu_output.error_flags),
-                                3'(alu_output.error_flags)}) else begin
-                        $error("Test failed - invalid error flags (actual: %06b, expected: %06b)",
-                            out_error_packet[7-:6], {3'(alu_output.error_flags),
-                                3'(alu_output.error_flags)},
-                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d, ",
-                            A, B, operation, removed_packets_from_A, removed_packets_from_B,
-                            "random CRC = %0d)", should_randomize_crc);
-                        test_result = "FAILED";
-                    end
-                    assert(out_error_packet[1] === alu_output.parity) else begin
-                        $error("Test failed - invalid parity bit (actual: %0d, expected: %0d)",
-                            out_error_packet[1], alu_output.parity,
-                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                            A, B, operation, removed_packets_from_A, removed_packets_from_B);
-                        test_result = "FAILED";
-                    end
-                end else begin
-                    bit [54:0] out_stream;
-                    bit [31:0] actual_C;
-                    bit [3:0] actual_flags;
-                    foreach (out_success_packets[i,j]) begin
-                        @(negedge clk);
-                        out_success_packets[i][j] = sout;
-                    end
-                    out_stream = out_success_packets;
-                    actual_C = {out_stream[52-:8], out_stream[41-:8], out_stream[30-:8],
-                        out_stream[19-:8]};
-                    assert(actual_C === alu_output.C) else begin
-                        $error("Test failed - invalid result (actual: %0h, expected: %0h)",
-                            actual_C, alu_output.C,
-                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                            A, B, operation, removed_packets_from_A, removed_packets_from_B);
-                    end
-                    actual_flags = out_success_packets[4][7-:4];
-                    assert(actual_flags === alu_output.flags) else begin
-                        $error("Test failed - invalid flags (actual %04b, expected: %04b)",
-                            actual_flags, alu_output.flags,
-                            "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                            A, B, operation, removed_packets_from_A, removed_packets_from_B);
-                    end
+            alu_output = get_expected_output(
+                A, B, operation, removed_packets_from_A, removed_packets_from_B);
+            if (3'(alu_output.error_flags) !== 3'b000) begin
+                foreach (out_error_packet[i]) begin
+                    @(negedge clk);
+                    out_error_packet[i] = sout;
                 end
-                data_sent = 0;
+                assert(out_error_packet[7-:6] === {3'(alu_output.error_flags),
+                            3'(alu_output.error_flags)}) else begin
+                    $error("Test failed - invalid error flags (actual: %06b, expected: %06b)",
+                        out_error_packet[7-:6], {3'(alu_output.error_flags),
+                            3'(alu_output.error_flags)},
+                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d, ",
+                        A, B, operation, removed_packets_from_A, removed_packets_from_B,
+                        "random CRC = %0d)", should_randomize_crc);
+                    test_result = "FAILED";
+                end
+                assert(out_error_packet[1] === alu_output.parity) else begin
+                    $error("Test failed - invalid parity bit (actual: %0d, expected: %0d)",
+                        out_error_packet[1], alu_output.parity,
+                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                        A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                    test_result = "FAILED";
+                end
+            end else begin
+                bit [54:0] out_stream;
+                bit [31:0] actual_C;
+                bit [3:0] actual_flags;
+                foreach (out_success_packets[i,j]) begin
+                    @(negedge clk);
+                    out_success_packets[i][j] = sout;
+                end
+                out_stream = out_success_packets;
+                actual_C = {out_stream[52-:8], out_stream[41-:8], out_stream[30-:8],
+                    out_stream[19-:8]};
+                assert(actual_C === alu_output.C) else begin
+                    $error("Test failed - invalid result (actual: %0h, expected: %0h)",
+                        actual_C, alu_output.C,
+                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                        A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                end
+                actual_flags = out_success_packets[4][7-:4];
+                assert(actual_flags === alu_output.flags) else begin
+                    $error("Test failed - invalid flags (actual %04b, expected: %04b)",
+                        actual_flags, alu_output.flags,
+                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                        A, B, operation, removed_packets_from_A, removed_packets_from_B);
+                end
             end
+            tb_state = TEST_STATE;
         end
     end : scoreboard
 
