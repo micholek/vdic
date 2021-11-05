@@ -14,7 +14,7 @@ interface alu_bfm;
     action_t action;
     bit should_randomize_crc;
     tb_state_t tb_state;
-    
+
     string test_result = "PASSED";
 
     initial begin : clk_gen
@@ -30,5 +30,26 @@ interface alu_bfm;
         @(negedge clk);
         rst_n = 1'b1;
     endtask : reset_alu
+
+    task send_packets(in_packets_t packets);
+        foreach (packets[i,j]) begin : tester_send_packet
+            @(negedge bfm.clk);
+            bfm.sin = packets[i][j];
+        end
+    endtask : send_packets
+
+    task receive_error_packet(output packet_t packet);
+        foreach (packet[i]) begin
+            @(negedge bfm.clk);
+            packet[i] = bfm.sout;
+        end
+    endtask : receive_error_packet
+
+    task receive_success_packets(output out_packets_t packets);
+        foreach (packets[i,j]) begin
+            @(negedge bfm.clk);
+            packets[i][j] = bfm.sout;
+        end
+    endtask : receive_success_packets
 
 endinterface : alu_bfm

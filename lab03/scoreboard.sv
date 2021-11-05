@@ -75,10 +75,7 @@ module scoreboard(alu_bfm bfm);
                 bfm.A, bfm.B, bfm.operation, bfm.removed_packets_from_A,
                 bfm.removed_packets_from_B, bfm.should_randomize_crc);
             if (alu_output.error_flags !== error_flags_t'(0)) begin
-                foreach (out_error_packet[i]) begin
-                    @(negedge bfm.clk);
-                    out_error_packet[i] = bfm.sout;
-                end
+                bfm.receive_error_packet(out_error_packet);
                 assert(out_error_packet[7-:2*$bits(error_flags_t)] === {alu_output.error_flags,
                             alu_output.error_flags}) else begin
                     $error("Test failed - invalid error flags (actual: %06b, expected: %06b)",
@@ -103,10 +100,7 @@ module scoreboard(alu_bfm bfm);
                 bit [31:0] actual_C;
                 flags_t actual_flags;
                 out_crc_t actual_crc;
-                foreach (out_success_packets[i,j]) begin
-                    @(negedge bfm.clk);
-                    out_success_packets[i][j] = bfm.sout;
-                end
+                bfm.receive_success_packets(out_success_packets);
                 out_stream = out_success_packets;
                 actual_C = {out_stream[52-:8], out_stream[41-:8], out_stream[30-:8],
                     out_stream[19-:8]};

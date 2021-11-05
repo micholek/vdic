@@ -146,11 +146,7 @@ module tester(alu_bfm bfm);
             bfm.operation = generate_operation();
             in_packets = create_in_packets(bfm.A, bfm.B, bfm.operation, bfm.removed_packets_from_A,
                 bfm.removed_packets_from_B);
-
-            foreach (in_packets[i,j]) begin : tester_send_packet
-                @(negedge bfm.clk);
-                bfm.sin = in_packets[i][j];
-            end
+            bfm.send_packets(in_packets);
             bfm.tb_state = SCORE_AND_COV_STATE;
         end
 
