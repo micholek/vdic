@@ -1,0 +1,14 @@
+*
+!.gitignore
+!Makefile
+!alu_bfm.sv
+!alu_pkg.sv
+!coverage.sv
+!dut.f
+!mtm_Alu.vp
+!run_xrun.sh
+!scoreboard.sv
+!tb.f
+!tester.sv
+!top.sv
+!xrun_covfile.txt
