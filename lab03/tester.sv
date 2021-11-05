@@ -30,18 +30,6 @@ module tester(alu_bfm bfm);
             bfm.test_result = "FAILED";
             $finish;
         end
-        if (removed_packets > 0) begin
-            operand[31-:8] = 8'b11111111;
-        end
-        if (removed_packets > 1) begin
-            operand[23-:8] = 8'b11111111;
-        end
-        if (removed_packets > 2) begin
-            operand[15-:8] = 8'b11111111;
-        end
-        if (removed_packets > 3) begin
-            operand[7-:8] = 8'b11111111;
-        end
         return operand;
     endfunction : generate_operand
 
