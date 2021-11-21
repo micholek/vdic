@@ -1,6 +1,7 @@
 *
 !.gitignore
 !Makefile
+!lab04part1_shapes.txt
 !top.sv
 !rectangle.svh
 !run_xrun.sh
