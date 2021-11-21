@@ -1,3 +1,7 @@
 *
 !.gitignore
 !top.sv
+!rectangle.svh
+!shape.svh
+!square.svh
+!triangle.svh
