@@ -1,7 +1,9 @@
 *
 !.gitignore
+!Makefile
 !top.sv
 !rectangle.svh
+!run_xrun.sh
 !shape.svh
 !square.svh
 !triangle.svh
