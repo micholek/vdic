@@ -5,5 +5,6 @@
 !rectangle.svh
 !run_xrun.sh
 !shape.svh
+!shape_factory.svh
 !square.svh
 !triangle.svh
