@@ -33,22 +33,22 @@ interface alu_bfm;
 
     task send_packets(in_packets_t packets);
         foreach (packets[i,j]) begin : tester_send_packet
-            @(negedge bfm.clk);
-            bfm.sin = packets[i][j];
+            @(negedge clk);
+            sin = packets[i][j];
         end
     endtask : send_packets
 
     task receive_error_packet(output packet_t packet);
         foreach (packet[i]) begin
-            @(negedge bfm.clk);
-            packet[i] = bfm.sout;
+            @(negedge clk);
+            packet[i] = sout;
         end
     endtask : receive_error_packet
 
     task receive_success_packets(output out_packets_t packets);
         foreach (packets[i,j]) begin
-            @(negedge bfm.clk);
-            packets[i][j] = bfm.sout;
+            @(negedge clk);
+            packets[i][j] = sout;
         end
     endtask : receive_success_packets
 
