@@ -1,9 +1,10 @@
 module top;
+
+    import alu_pkg::*;
+
     alu_bfm    bfm();
 
-    tester     tester_i(bfm);
-    coverage   coverage_i(bfm);
-    scoreboard scoreboard_i(bfm);
+    testbench testbench_h;
 
     mtm_Alu alu(
         .clk(bfm.clk),
@@ -11,4 +12,14 @@ module top;
         .sin(bfm.sin),
         .sout(bfm.sout)
     );
+
+    initial begin
+        testbench_h = new(bfm);
+        testbench_h.execute();
+    end
+
+    final begin
+        $display("Test %s", bfm.test_result);
+    end
+
 endmodule : top
