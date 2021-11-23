@@ -9,6 +9,7 @@
 !run_xrun.sh
 !scoreboard.sv
 !tb.f
+!testbench.svh
 !tester.sv
 !top.sv
 !xrun_covfile.txt
