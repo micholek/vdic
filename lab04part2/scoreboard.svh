@@ -1,7 +1,12 @@
-module scoreboard(alu_bfm bfm);
-    import alu_pkg::*;
+class scoreboard;
 
-    function out_crc_t calculate_out_crc(bit [31:0] op_result, bit [3:0] out_flags);
+    virtual alu_bfm bfm;
+
+    function new(virtual alu_bfm bfm);
+        this.bfm = bfm;
+    endfunction : new
+
+    protected function out_crc_t calculate_out_crc(bit [31:0] op_result, bit [3:0] out_flags);
         automatic bit [36:0] d = {op_result, 1'b0, out_flags};
         static out_crc_t c = 0;
         return {
@@ -15,8 +20,8 @@ module scoreboard(alu_bfm bfm);
         };
     endfunction : calculate_out_crc
 
-    function alu_output_t get_expected_output(bit [31:0] X, bit [31:0] Y, bit [2:0] operation,
-            bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y,
+    protected function alu_output_t get_expected_output(bit [31:0] X, bit [31:0] Y,
+            bit [2:0] operation, bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y,
             bit should_randomize_crc);
         operation_t op;
         automatic alu_output_t out = alu_output_t'(0);
@@ -60,12 +65,10 @@ module scoreboard(alu_bfm bfm);
             out.crc = calculate_out_crc(out.C, out.flags);
             out.error_flags = 3'b000;
         end
-
         return out;
     endfunction : get_expected_output
 
-
-    initial begin
+    task execute();
         packet_t out_error_packet;
         out_packets_t out_success_packets;
         alu_output_t alu_output;
@@ -130,17 +133,6 @@ module scoreboard(alu_bfm bfm);
             end
             bfm.tb_state = TEST_STATE;
         end
-    end
+    endtask : execute
 
-
-    final begin : finish_of_the_test
-        $display("Test %s", bfm.test_result);
-    end
-
-endmodule : scoreboard
-
-
-
-
-
-
+endclass : scoreboard

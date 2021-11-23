@@ -1,5 +1,6 @@
-module coverage(alu_bfm bfm);
-    import alu_pkg::*;
+class coverage;
+
+    virtual alu_bfm bfm;
 
     bit [31:0] A;
     bit [31:0] B;
@@ -105,14 +106,14 @@ module coverage(alu_bfm bfm);
         }
     endgroup : error_cov
 
-    operation_cov operation_c;
-    data_cov data_c;
-    error_cov error_c;
+    function new(virtual alu_bfm bfm);
+        operation_cov = new();
+        data_cov = new();
+        error_cov = new();
+        this.bfm = bfm;
+    endfunction : new
 
-    initial begin
-        operation_c = new();
-        data_c = new();
-        error_c = new();
+    task execute();
         forever begin
             @(posedge bfm.clk);
             if (bfm.tb_state === SCORE_AND_COV_STATE || !bfm.rst_n) begin
@@ -123,12 +124,11 @@ module coverage(alu_bfm bfm);
                 removed_packets_from_B = bfm.removed_packets_from_B;
                 action = bfm.action;
                 should_randomize_crc = bfm.should_randomize_crc;
-                operation_c.sample();
-                data_c.sample();
-                error_c.sample();
+                operation_cov.sample();
+                data_cov.sample();
+                error_cov.sample();
             end
         end
-    end
+    endtask : execute
 
-
-endmodule : coverage
+endclass : coverage

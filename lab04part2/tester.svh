@@ -1,7 +1,12 @@
-module tester(alu_bfm bfm);
-    import alu_pkg::*;
+class tester;
 
-    function action_t generate_action();
+    virtual alu_bfm bfm;
+
+    function new(virtual alu_bfm bfm);
+        this.bfm = bfm;
+    endfunction : new
+
+    protected function action_t generate_action();
         action_t action;
         automatic bit randomize_res = std::randomize(action) with {
             action dist { RESET_ACTION := 1, OPERATION_ACTION := 3 };
@@ -15,11 +20,11 @@ module tester(alu_bfm bfm);
         return action;
     endfunction : generate_action
 
-    function bit [2:0] generate_operation();
+    protected function bit [2:0] generate_operation();
         return 3'($random);
     endfunction : generate_operation
 
-    function bit [31:0] generate_operand(bit [2:0] removed_packets);
+    protected function bit [31:0] generate_operand(bit [2:0] removed_packets);
         bit [31:0] operand;
         automatic bit randomize_res = std::randomize(operand) with {
             operand dist { 0 := 1, [1:32'hfffffffe] :/ 2, 32'hffffffff := 1 };
@@ -33,7 +38,7 @@ module tester(alu_bfm bfm);
         return operand;
     endfunction : generate_operand
 
-    function bit [2:0] generate_removed_packets_number();
+    protected function bit [2:0] generate_removed_packets_number();
         bit [2:0] removed_packets_number;
         automatic bit randomize_res = std::randomize(removed_packets_number) with {
             removed_packets_number dist { 0 := 4, [1:4] :/ 1 };
@@ -47,7 +52,7 @@ module tester(alu_bfm bfm);
         return removed_packets_number;
     endfunction : generate_removed_packets_number
 
-    function bit generate_should_randomize_crc();
+    protected function bit generate_should_randomize_crc();
         bit should_randomize;
         automatic bit randomize_res = std::randomize(should_randomize) with {
             should_randomize dist { 0 := 3, 1 := 1 };
@@ -61,15 +66,15 @@ module tester(alu_bfm bfm);
         return should_randomize;
     endfunction : generate_should_randomize_crc
 
-    function packet_t create_cmd_packet(byte payload);
+    protected function packet_t create_cmd_packet(byte payload);
         return {2'b01, payload, 1'b1};
     endfunction : create_cmd_packet
 
-    function packet_t create_data_packet(byte payload);
+    protected function packet_t create_data_packet(byte payload);
         return {2'b00, payload, 1'b1};
     endfunction : create_data_packet
 
-    function in_crc_t calculate_in_crc(bit [31:0] X, bit [31:0] Y, bit [2:0] operation);
+    protected function in_crc_t calculate_in_crc(bit [31:0] X, bit [31:0] Y, bit [2:0] operation);
         automatic bit [67:0] d = {X, Y, 1'b1, operation};
         static in_crc_t c = 0;
         return {
@@ -92,8 +97,8 @@ module tester(alu_bfm bfm);
         };
     endfunction : calculate_in_crc
 
-    function in_packets_t create_in_packets(bit [31:0] X, bit [31:0] Y, bit [2:0] operation,
-            bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y);
+    protected function in_packets_t create_in_packets(bit [31:0] X, bit [31:0] Y,
+            bit [2:0] operation, bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y);
         in_crc_t random_crc;
         automatic in_crc_t crc = calculate_in_crc(X, Y, operation);
         bfm.should_randomize_crc = generate_should_randomize_crc();
@@ -115,7 +120,7 @@ module tester(alu_bfm bfm);
         };
     endfunction : create_in_packets
 
-    initial begin
+    task execute();
         in_packets_t in_packets;
 
         bfm.reset_alu();
@@ -137,7 +142,7 @@ module tester(alu_bfm bfm);
             bfm.send_packets(in_packets);
             bfm.tb_state = SCORE_AND_COV_STATE;
         end
-
         $finish;
-    end
-endmodule : tester
+    endtask : execute
+
+endclass : tester

@@ -45,4 +45,10 @@ package alu_pkg;
 
     typedef packet_t[0:8] in_packets_t;
     typedef packet_t[0:4] out_packets_t;
+
+    `include "tester.svh"
+    `include "coverage.svh"
+    `include "scoreboard.svh"
+    `include "testbench.svh"
+
 endpackage : alu_pkg
