@@ -21,4 +21,8 @@ class testbench;
         join_none
     endtask : execute
 
+    function void print_result();
+        $display("Test %s", bfm.test_result);
+    endfunction : print_result
+
 endclass : testbench

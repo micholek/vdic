@@ -18,8 +18,8 @@ module top;
         testbench_h.execute();
     end
 
-    final begin
-        $display("Test %s", bfm.test_result);
+    final begin : finish_of_the_test
+        testbench_h.print_result();
     end
 
 endmodule : top
