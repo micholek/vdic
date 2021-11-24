@@ -3,13 +3,13 @@
 !Makefile
 !alu_bfm.sv
 !alu_pkg.sv
-!coverage.sv
+!coverage.svh
 !dut.f
 !mtm_Alu.vp
 !run_xrun.sh
-!scoreboard.sv
+!scoreboard.svh
 !tb.f
 !testbench.svh
-!tester.sv
+!tester.svh
 !top.sv
 !xrun_covfile.txt
