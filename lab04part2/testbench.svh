@@ -1,14 +1,14 @@
 class testbench;
 
     virtual alu_bfm bfm;
+    
+    protected tester tester_h;
+    protected coverage coverage_h;
+    protected scoreboard scoreboard_h;
 
     function new(virtual alu_bfm bfm);
         this.bfm = bfm;
     endfunction : new
-
-    tester tester_h;
-    coverage coverage_h;
-    scoreboard scoreboard_h;
 
     task execute();
         tester_h = new(bfm);

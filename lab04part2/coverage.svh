@@ -2,13 +2,13 @@ class coverage;
 
     virtual alu_bfm bfm;
 
-    bit [31:0] A;
-    bit [31:0] B;
-    bit [2:0] operation;
-    bit [2:0] removed_packets_from_A;
-    bit [2:0] removed_packets_from_B;
-    action_t action;
-    bit should_randomize_crc;
+    protected bit [31:0] A;
+    protected bit [31:0] B;
+    protected bit [2:0] operation;
+    protected bit [2:0] removed_packets_from_A;
+    protected bit [2:0] removed_packets_from_B;
+    protected action_t action;
+    protected bit should_randomize_crc;
 
     covergroup operation_cov;
         option.name = "cg_operation_cov";
