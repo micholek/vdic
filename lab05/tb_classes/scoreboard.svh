@@ -1,9 +1,11 @@
-class scoreboard;
+class scoreboard extends uvm_component;
+
+    `uvm_component_utils(scoreboard)
 
     virtual alu_bfm bfm;
 
-    function new(virtual alu_bfm bfm);
-        this.bfm = bfm;
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
     endfunction : new
 
     protected function out_crc_t calculate_out_crc(bit [31:0] op_result, bit [3:0] out_flags);
@@ -68,7 +70,12 @@ class scoreboard;
         return out;
     endfunction : get_expected_output
 
-    task execute();
+    function void build_phase(uvm_phase phase);
+        if(!uvm_config_db #(virtual alu_bfm)::get(null, "*", "bfm", bfm))
+            $fatal(1, "Failed to get BFM");
+    endfunction : build_phase
+
+    task run_phase(uvm_phase phase);
         packet_t out_error_packet;
         out_packets_t out_success_packets;
         alu_output_t alu_output;
@@ -133,6 +140,10 @@ class scoreboard;
             end
             bfm.tb_state = TEST_STATE;
         end
-    endtask : execute
+    endtask : run_phase
+    
+    function void report_phase(uvm_phase phase);
+        $display("********** Test %s **********", bfm.test_result);
+    endfunction : report_phase
 
 endclass : scoreboard

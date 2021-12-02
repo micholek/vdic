@@ -1,4 +1,6 @@
-class coverage;
+class coverage extends uvm_component;
+
+    `uvm_component_utils(coverage)
 
     virtual alu_bfm bfm;
 
@@ -106,14 +108,19 @@ class coverage;
         }
     endgroup : error_cov
 
-    function new(virtual alu_bfm bfm);
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
         operation_cov = new();
         data_cov = new();
         error_cov = new();
-        this.bfm = bfm;
     endfunction : new
 
-    task execute();
+    function void build_phase(uvm_phase phase);
+        if(!uvm_config_db#(virtual alu_bfm)::get(null, "*", "bfm", bfm))
+            $fatal(1, "Failed to get BFM");
+    endfunction : build_phase
+
+    task run_phase(uvm_phase phase);
         forever begin
             @(posedge bfm.clk);
             if (bfm.tb_state === SCORE_AND_COV_STATE || !bfm.rst_n) begin
@@ -129,6 +136,6 @@ class coverage;
                 error_cov.sample();
             end
         end
-    endtask : execute
+    endtask : run_phase
 
 endclass : coverage
