@@ -1,4 +1,7 @@
 package alu_pkg;
+    import uvm_pkg::*;
+    `include "uvm_macros.svh"
+
     typedef enum bit {
         TEST_STATE = 0,
         SCORE_AND_COV_STATE = 1
@@ -46,9 +49,13 @@ package alu_pkg;
     typedef packet_t[0:8] in_packets_t;
     typedef packet_t[0:4] out_packets_t;
 
-    `include "tester.svh"
+    `include "base_tester.svh"
+    `include "random_tester.svh"
+    `include "min_max_tester.svh"
     `include "coverage.svh"
     `include "scoreboard.svh"
-    `include "testbench.svh"
+    `include "env.svh"
+    `include "random_test.svh"
+    `include "min_max_test.svh"
 
 endpackage : alu_pkg
