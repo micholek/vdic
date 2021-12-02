@@ -1,10 +1,11 @@
 module top;
 
+    import uvm_pkg::*;
+    `include "uvm_macros.svh"
+
     import alu_pkg::*;
 
-    alu_bfm    bfm();
-
-    testbench testbench_h;
+    alu_bfm bfm();
 
     mtm_Alu alu(
         .clk(bfm.clk),
@@ -14,12 +15,8 @@ module top;
     );
 
     initial begin
-        testbench_h = new(bfm);
-        testbench_h.execute();
-    end
-
-    final begin : finish_of_the_test
-        testbench_h.print_result();
+        uvm_config_db#(virtual alu_bfm)::set(null, "*", "bfm", bfm);
+        run_test();
     end
 
 endmodule : top
