@@ -33,27 +33,42 @@ package alu_pkg;
         bit op;
     } error_flags_t;
 
+    typedef bit [3:0] in_crc_t;
+
+    typedef struct packed {
+        bit [31:0] A;
+        bit [31:0] B;
+        bit [2:0] removed_packets_from_A;
+        bit [2:0] removed_packets_from_B;
+        bit [2:0] operation;
+        bit should_randomize_crc;
+        in_crc_t crc;
+        action_t action;
+    } alu_input_t;
+
+    typedef bit [2:0] out_crc_t;
+
     typedef struct packed {
         bit [31:0] C;
         flags_t flags;
         error_flags_t error_flags;
-        bit [2:0] crc;
+        out_crc_t crc;
         bit parity;
     } alu_output_t;
-
-    typedef bit [3:0] in_crc_t;
-    typedef bit [2:0] out_crc_t;
 
     typedef bit [10:0] packet_t;
 
     typedef packet_t[0:8] in_packets_t;
     typedef packet_t[0:4] out_packets_t;
 
+    `include "coverage.svh"
     `include "base_tester.svh"
     `include "random_tester.svh"
     `include "min_max_tester.svh"
-    `include "coverage.svh"
     `include "scoreboard.svh"
+    `include "driver.svh"
+    `include "alu_input_monitor.svh"
+    `include "result_monitor.svh"
     `include "env.svh"
     `include "random_test.svh"
     `include "min_max_test.svh"

@@ -74,10 +74,10 @@ fi
 #>>>
 #------------------------------------------------------------------------------
 # simulator arguments #<<<
-COV_ARGS=""
-if [[ "$RUN_IMC" != "" ]]; then
+# COV_ARGS=""
+# if [[ "$RUN_IMC" != "" ]]; then
   COV_ARGS="-coverage all -covoverwrite -covfile xrun_covfile.txt" 
-fi
+# fi
 XRUN_ARGS="\
   -F $FFILE \
   -v93 \
@@ -150,8 +150,8 @@ function xrun_run_all_tests() { #<<<
       fi
       xrun $XRUN_ARGS \
         $COV_TEST \
+        +UVM_TESTNAME=${TESTS[0]} \
         -l xrun_gui.log
-#        +UVM_TESTNAME=${TESTS[0]} \
   else  
     TEST_LIST=""
 

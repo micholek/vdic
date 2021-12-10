@@ -1,11 +1,14 @@
-class scoreboard extends uvm_component;
+class scoreboard extends uvm_subscriber#(alu_output_t);
 
     `uvm_component_utils(scoreboard)
 
-    virtual alu_bfm bfm;
+    uvm_tlm_analysis_fifo#(alu_input_t) alu_input_f;
+
+    string test_result;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
+        test_result = "PASSED";
     endfunction : new
 
     protected function out_crc_t calculate_out_crc(bit [31:0] op_result, bit [3:0] out_flags);
@@ -22,43 +25,41 @@ class scoreboard extends uvm_component;
         };
     endfunction : calculate_out_crc
 
-    protected function alu_output_t get_expected_output(bit [31:0] X, bit [31:0] Y,
-            bit [2:0] operation, bit [2:0] removed_packets_from_X, bit [2:0] removed_packets_from_Y,
-            bit should_randomize_crc);
+    protected function alu_output_t get_expected_output(alu_input_t alu_input);
         operation_t op;
         automatic alu_output_t out = alu_output_t'(0);
         automatic bit [32:0] aux_buffer = 33'b0;
-        if (removed_packets_from_X > 0 || removed_packets_from_Y > 0) begin
+        if (alu_input.removed_packets_from_A > 0 || alu_input.removed_packets_from_B > 0) begin
             out.error_flags.data = 1;
-        end else if (should_randomize_crc === 1) begin
+        end else if (alu_input.should_randomize_crc === 1) begin
             out.error_flags.crc = 1;
-        end else if ($cast(op, operation) === 0) begin
+        end else if ($cast(op, alu_input.operation) === 0) begin
             out.error_flags.op = 1;
         end
         if (out.error_flags != error_flags_t'(0)) begin
             out.parity = ^{1'b1, out.error_flags, out.error_flags};
         end else begin
+            automatic bit [31:0] A = alu_input.A;
+            automatic bit [31:0] B = alu_input.B;
             case (op)
                 AND_OPERATION: begin
-                    out.C = X & Y;
+                    out.C = A & B;
                 end
                 OR_OPERATION: begin
-                    out.C = X | Y;
+                    out.C = A | B;
                 end
                 ADD_OPERATION: begin
-                    aux_buffer = {1'b0, X} + {1'b0, Y};
-                    out.C = X + Y;
-                    out.flags.overflow = ~(X[31] ^ Y[31]) & (X[31] ^ out.C[31]);
+                    aux_buffer = {1'b0, A} + {1'b0, B};
+                    out.C = A + B;
+                    out.flags.overflow = ~(A[31] ^ B[31]) & (A[31] ^ out.C[31]);
                 end
                 SUB_OPERATION: begin
-                    aux_buffer = {1'b0, X} - {1'b0, Y};
-                    out.C = X - Y;
-                    out.flags.overflow = (X[31] ^ Y[31]) & (X[31] ^ out.C[31]);
+                    aux_buffer = {1'b0, A} - {1'b0, B};
+                    out.C = A - B;
+                    out.flags.overflow = (A[31] ^ B[31]) & (A[31] ^ out.C[31]);
                 end
                 default: begin
-                    $error("Unreachable - unexpected operation");
-                    bfm.test_result = "FAILED";
-                    $finish;
+                    $fatal(1, "Unreachable - unexpected operation");
                 end
             endcase
             out.flags.carry = aux_buffer[32] === 1'b1;
@@ -71,80 +72,69 @@ class scoreboard extends uvm_component;
     endfunction : get_expected_output
 
     function void build_phase(uvm_phase phase);
-        if(!uvm_config_db #(virtual alu_bfm)::get(null, "*", "bfm", bfm))
-            $fatal(1, "Failed to get BFM");
+        alu_input_f = new ("alu_input_f", this);
     endfunction : build_phase
 
-    task run_phase(uvm_phase phase);
-        packet_t out_error_packet;
-        out_packets_t out_success_packets;
+    function void write(alu_output_t t);
+        alu_input_t alu_input;
         alu_output_t alu_output;
-        forever begin
-            @(negedge bfm.sout);
-            alu_output = get_expected_output(
-                bfm.A, bfm.B, bfm.operation, bfm.removed_packets_from_A,
-                bfm.removed_packets_from_B, bfm.should_randomize_crc);
-            if (alu_output.error_flags !== error_flags_t'(0)) begin
-                bfm.receive_error_packet(out_error_packet);
-                assert(out_error_packet[7-:2*$bits(error_flags_t)] === {alu_output.error_flags,
-                            alu_output.error_flags}) else begin
-                    $error("Test failed - invalid error flags (actual: %06b, expected: %06b)",
-                        out_error_packet[7-:6], {3'(alu_output.error_flags),
-                            3'(alu_output.error_flags)},
-                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d, ",
-                        bfm.A, bfm.B, bfm.operation, bfm.removed_packets_from_A,
-                        bfm.removed_packets_from_B, "random CRC = %0d)",
-                        bfm.should_randomize_crc);
-                    bfm.test_result = "FAILED";
-                end
-                assert(out_error_packet[1] === alu_output.parity) else begin
-                    $error("Test failed - invalid parity bit (actual: %0d, expected: %0d)",
-                        out_error_packet[1], alu_output.parity,
-                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                        bfm.A, bfm.B, bfm.operation, bfm.removed_packets_from_A,
-                        bfm.removed_packets_from_B);
-                    bfm.test_result = "FAILED";
-                end
-            end else begin
-                bit [54:0] out_stream;
-                bit [31:0] actual_C;
-                flags_t actual_flags;
-                out_crc_t actual_crc;
-                bfm.receive_success_packets(out_success_packets);
-                out_stream = out_success_packets;
-                actual_C = {out_stream[52-:8], out_stream[41-:8], out_stream[30-:8],
-                    out_stream[19-:8]};
-                assert(actual_C === alu_output.C) else begin
-                    $error("Test failed - invalid result (actual: %0h, expected: %0h)",
-                        actual_C, alu_output.C,
-                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                        bfm.A, bfm.B, bfm.operation, bfm.removed_packets_from_A,
-                        bfm.removed_packets_from_B);
-                end
-                actual_flags = out_success_packets[4][7-:$bits(flags_t)];
-                assert(actual_flags === alu_output.flags) else begin
-                    $error("Test failed - invalid flags (actual %04b, expected: %04b)",
-                        actual_flags, alu_output.flags,
-                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                        bfm.A, bfm.B, bfm.operation, bfm.removed_packets_from_A,
-                        bfm.removed_packets_from_B);
-                end
-                actual_crc = out_success_packets[4][3-:$bits(out_crc_t)];
-                assert(actual_crc === alu_output.crc) else begin
-                    $error("Test failed - invalid CRC (actual %03b, expected: %03b)",
-                        actual_crc, alu_output.crc,
-                        "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                        bfm.A, bfm.B, bfm.operation, bfm.removed_packets_from_A,
-                        bfm.removed_packets_from_B);
-                end
+
+        alu_input.action = RESET_ACTION;
+        do
+            if (!alu_input_f.try_get(alu_input)) begin
+                $fatal(1, "Missing command in self checker");
             end
-            bfm.tb_state = TEST_STATE;
+        while (alu_input.action == RESET_ACTION);
+        alu_output = get_expected_output(alu_input);
+        if (alu_output.error_flags !== error_flags_t'(0)) begin
+            assert({t.error_flags, t.error_flags} === {alu_output.error_flags,
+                        alu_output.error_flags}) else begin
+                $error("Test failed - invalid error flags (actual: %06b, expected: %06b)",
+                    {t.error_flags, t.error_flags}, {alu_output.error_flags,
+                        alu_output.error_flags},
+                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d, ",
+                    alu_input.A, alu_input.B, alu_input.operation,
+                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B,
+                    "random CRC = %0d)", alu_input.should_randomize_crc);
+                test_result = "FAILED";
+            end
+            assert(t.parity === alu_output.parity) else begin
+                $error("Test failed - invalid parity bit (actual: %0d, expected: %0d)",
+                    t.parity, alu_output.parity,
+                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                    alu_input.A, alu_input.B, alu_input.operation,
+                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B);
+                test_result = "FAILED";
+            end
+        end else begin
+            bit [54:0] out_stream;
+            assert(t.C === alu_output.C) else begin
+                $error("Test failed - invalid result (actual: %0h, expected: %0h)",
+                    t.C, alu_output.C,
+                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                    alu_input.A, alu_input.B, alu_input.operation,
+                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B);
+            end
+            assert(t.flags === alu_output.flags) else begin
+                $error("Test failed - invalid flags (actual %04b, expected: %04b)",
+                    t.flags, alu_output.flags,
+                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                    alu_input.A, alu_input.B, alu_input.operation,
+                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B);
+            end
+            assert(t.crc === alu_output.crc) else begin
+                $error("Test failed - invalid CRC (actual %03b, expected: %03b)",
+                    t.crc, alu_output.crc,
+                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
+                    alu_input.A, alu_input.B, alu_input.operation,
+                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B);
+            end
         end
-    endtask : run_phase
-    
+    endfunction : write
+
     function void report_phase(uvm_phase phase);
-        string color = bfm.test_result == "PASSED" ? "92" : "91";
-        $display("\033[%sm********** Test %s **********\033[m", color, bfm.test_result);
+        string color = test_result == "PASSED" ? "92" : "91";
+        $display("\033[%sm********** Test %s **********\033[m", color, test_result);
     endfunction : report_phase
 
 endclass : scoreboard

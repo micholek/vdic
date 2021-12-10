@@ -1,8 +1,6 @@
-class coverage extends uvm_component;
+class coverage extends uvm_subscriber#(alu_input_t);
 
     `uvm_component_utils(coverage)
-
-    virtual alu_bfm bfm;
 
     protected bit [31:0] A;
     protected bit [31:0] B;
@@ -115,27 +113,17 @@ class coverage extends uvm_component;
         error_cov = new();
     endfunction : new
 
-    function void build_phase(uvm_phase phase);
-        if(!uvm_config_db#(virtual alu_bfm)::get(null, "*", "bfm", bfm))
-            $fatal(1, "Failed to get BFM");
-    endfunction : build_phase
-
-    task run_phase(uvm_phase phase);
-        forever begin
-            @(posedge bfm.clk);
-            if (bfm.tb_state === SCORE_AND_COV_STATE || !bfm.rst_n) begin
-                A = bfm.A;
-                B = bfm.B;
-                operation = bfm.operation;
-                removed_packets_from_A = bfm.removed_packets_from_A;
-                removed_packets_from_B = bfm.removed_packets_from_B;
-                action = bfm.action;
-                should_randomize_crc = bfm.should_randomize_crc;
-                operation_cov.sample();
-                data_cov.sample();
-                error_cov.sample();
-            end
-        end
-    endtask : run_phase
+    function void write(alu_input_t t);
+        A = t.A;
+        B = t.B;
+        operation = t.operation;
+        removed_packets_from_A = t.removed_packets_from_A;
+        removed_packets_from_B = t.removed_packets_from_B;
+        action = t.action;
+        should_randomize_crc = t.should_randomize_crc;
+        operation_cov.sample();
+        data_cov.sample();
+        error_cov.sample();
+    endfunction : write
 
 endclass : coverage
