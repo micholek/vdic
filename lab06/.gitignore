@@ -1,0 +1,13 @@
+*
+!.gitignore
+!Makefile
+!alu_bfm.sv
+!alu_pkg.sv
+!dut.f
+!mtm_Alu.vp
+!run_xrun.sh
+!tb.f
+!tb_classes
+!tb_classes/*
+!top.sv
+!xrun_covfile.txt
