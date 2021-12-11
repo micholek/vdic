@@ -8,7 +8,7 @@ class coverage extends uvm_subscriber#(alu_input_t);
     protected bit [2:0] removed_packets_from_A;
     protected bit [2:0] removed_packets_from_B;
     protected action_t action;
-    protected bit should_randomize_crc;
+    protected bit invalid_crc;
 
     covergroup operation_cov;
         option.name = "cg_operation_cov";
@@ -101,8 +101,8 @@ class coverage extends uvm_subscriber#(alu_input_t);
             wildcard ignore_bins C2_all_operations = {3'b?0?};
         }
 
-        cp_should_randomize_crc : coverpoint should_randomize_crc {
-            bins C3_random_crc[] = {0, 1};
+        cp_invalid_crc : coverpoint invalid_crc {
+            bins C3_invalid_crc[] = {0, 1};
         }
     endgroup : error_cov
 
@@ -120,7 +120,7 @@ class coverage extends uvm_subscriber#(alu_input_t);
         removed_packets_from_A = t.removed_packets_from_A;
         removed_packets_from_B = t.removed_packets_from_B;
         action = t.action;
-        should_randomize_crc = t.should_randomize_crc;
+        invalid_crc = t.invalid_crc;
         operation_cov.sample();
         data_cov.sample();
         error_cov.sample();

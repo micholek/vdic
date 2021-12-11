@@ -46,17 +46,17 @@ class random_tester extends base_tester;
         return removed_packets_number;
     endfunction : generate_removed_packets_number
 
-    protected function bit generate_should_randomize_crc();
-        bit should_randomize;
-        automatic bit randomize_res = std::randomize(should_randomize) with {
-            should_randomize dist { 0 := 3, 1 := 1 };
+    protected function bit generate_invalid_crc();
+        bit invalid_crc;
+        automatic bit randomize_res = std::randomize(invalid_crc) with {
+            invalid_crc dist { 0 := 3, 1 := 1 };
         };
         assert(randomize_res === 1'b1)
         else begin
             $fatal(1, "Generating crc randomize flag failed");
         end
-        return should_randomize;
-    endfunction : generate_should_randomize_crc
+        return invalid_crc;
+    endfunction : generate_invalid_crc
 
     protected function in_crc_t generate_in_crc(bit [31:0] X, bit [31:0] Y, bit [2:0] operation,
             bit invalid_crc);

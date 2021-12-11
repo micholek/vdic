@@ -31,7 +31,7 @@ class scoreboard extends uvm_subscriber#(alu_output_t);
         automatic bit [32:0] aux_buffer = 33'b0;
         if (alu_input.removed_packets_from_A > 0 || alu_input.removed_packets_from_B > 0) begin
             out.error_flags.data = 1;
-        end else if (alu_input.should_randomize_crc === 1) begin
+        end else if (alu_input.invalid_crc === 1) begin
             out.error_flags.crc = 1;
         end else if ($cast(op, alu_input.operation) === 0) begin
             out.error_flags.op = 1;
@@ -95,7 +95,7 @@ class scoreboard extends uvm_subscriber#(alu_output_t);
                     "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d, ",
                     alu_input.A, alu_input.B, alu_input.operation,
                     alu_input.removed_packets_from_A, alu_input.removed_packets_from_B,
-                    "random CRC = %0d)", alu_input.should_randomize_crc);
+                    "random CRC = %0d)", alu_input.invalid_crc);
                 test_result = "FAILED";
             end
             assert(t.parity === alu_output.parity) else begin

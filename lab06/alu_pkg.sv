@@ -41,7 +41,7 @@ package alu_pkg;
         bit [2:0] removed_packets_from_A;
         bit [2:0] removed_packets_from_B;
         bit [2:0] operation;
-        bit should_randomize_crc;
+        bit invalid_crc;
         in_crc_t crc;
         action_t action;
     } alu_input_t;

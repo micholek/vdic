@@ -40,8 +40,7 @@ interface alu_bfm;
 
         @(negedge sout);
         if (alu_input.removed_packets_from_A || alu_input.removed_packets_from_B ||
-                alu_input.should_randomize_crc ||
-                !(alu_input.operation inside {`ALL_OPERATIONS})) begin
+                alu_input.invalid_crc || !(alu_input.operation inside {`ALL_OPERATIONS})) begin
             packet_t out_error_packet;
             receive_error_packet(out_error_packet);
             alu_output.error_flags = out_error_packet[7-:2*$bits(error_flags_t)];
