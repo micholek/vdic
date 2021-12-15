@@ -24,4 +24,4 @@ clean:
 	rm -f *.do
 	rm -f *.rpt
 	rm -f *.vRefine
-	rm -rf INCA_libs INCA_libs_gui waves.shm xcelium.d cov_work
+	rm -rf INCA_libs INCA_libs_gui waves.shm xcelium.d cov_work .simvision

@@ -1,10 +1,10 @@
-class scoreboard extends uvm_subscriber#(alu_output_t);
+class scoreboard extends uvm_subscriber#(result_transaction);
 
     `uvm_component_utils(scoreboard)
 
-    uvm_tlm_analysis_fifo#(alu_input_t) alu_input_f;
+    uvm_tlm_analysis_fifo#(random_alu_input_transaction) alu_input_f;
 
-    string test_result;
+    protected string test_result;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
@@ -25,7 +25,10 @@ class scoreboard extends uvm_subscriber#(alu_output_t);
         };
     endfunction : calculate_out_crc
 
-    protected function alu_output_t get_expected_output(alu_input_t alu_input);
+    protected function result_transaction get_expected_output(
+            random_alu_input_transaction alu_input_transaction);
+        result_transaction expected = new("expected");
+        alu_input_t alu_input = alu_input_transaction.alu_input;
         operation_t op;
         automatic alu_output_t out = alu_output_t'(0);
         automatic bit [32:0] aux_buffer = 33'b0;
@@ -68,67 +71,34 @@ class scoreboard extends uvm_subscriber#(alu_output_t);
             out.crc = calculate_out_crc(out.C, out.flags);
             out.error_flags = 3'b000;
         end
-        return out;
+        expected.alu_output = out;
+        return expected;
     endfunction : get_expected_output
 
     function void build_phase(uvm_phase phase);
         alu_input_f = new ("alu_input_f", this);
     endfunction : build_phase
 
-    function void write(alu_output_t t);
-        alu_input_t alu_input;
-        alu_output_t alu_output;
+    function void write(result_transaction t);
+        random_alu_input_transaction random_alu_input_t;
+        result_transaction result;
+        string result_info;
 
-        alu_input.action = RESET_ACTION;
         do
-            if (!alu_input_f.try_get(alu_input)) begin
+            if (!alu_input_f.try_get(random_alu_input_t)) begin
                 $fatal(1, "Missing command in self checker");
             end
-        while (alu_input.action == RESET_ACTION);
-        alu_output = get_expected_output(alu_input);
-        if (alu_output.error_flags !== error_flags_t'(0)) begin
-            assert({t.error_flags, t.error_flags} === {alu_output.error_flags,
-                        alu_output.error_flags}) else begin
-                $error("Test failed - invalid error flags (actual: %06b, expected: %06b)",
-                    {t.error_flags, t.error_flags}, {alu_output.error_flags,
-                        alu_output.error_flags},
-                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d, ",
-                    alu_input.A, alu_input.B, alu_input.operation,
-                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B,
-                    "random CRC = %0d)", alu_input.invalid_crc);
-                test_result = "FAILED";
-            end
-            assert(t.parity === alu_output.parity) else begin
-                $error("Test failed - invalid parity bit (actual: %0d, expected: %0d)",
-                    t.parity, alu_output.parity,
-                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                    alu_input.A, alu_input.B, alu_input.operation,
-                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B);
-                test_result = "FAILED";
-            end
+        while (random_alu_input_t.alu_input.action == RESET_ACTION);
+        result = get_expected_output(random_alu_input_t);
+
+        result_info = { random_alu_input_t.convert2string(), "\n\t   Actual: ", t.convert2string(),
+            "\n\t Expected: ", result.convert2string() };
+
+        if (!result.compare(t)) begin
+            `uvm_error("SELF CHECKER", { "FAIL\n", result_info })
+            test_result = "FAILED";
         end else begin
-            bit [54:0] out_stream;
-            assert(t.C === alu_output.C) else begin
-                $error("Test failed - invalid result (actual: %0h, expected: %0h)",
-                    t.C, alu_output.C,
-                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                    alu_input.A, alu_input.B, alu_input.operation,
-                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B);
-            end
-            assert(t.flags === alu_output.flags) else begin
-                $error("Test failed - invalid flags (actual %04b, expected: %04b)",
-                    t.flags, alu_output.flags,
-                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                    alu_input.A, alu_input.B, alu_input.operation,
-                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B);
-            end
-            assert(t.crc === alu_output.crc) else begin
-                $error("Test failed - invalid CRC (actual %03b, expected: %03b)",
-                    t.crc, alu_output.crc,
-                    "\n(A = %0h, B = %0h, operation = %0d, rem_A = %0d, rem_B = %0d)",
-                    alu_input.A, alu_input.B, alu_input.operation,
-                    alu_input.removed_packets_from_A, alu_input.removed_packets_from_B);
-            end
+            `uvm_info("SELF CHECKER", { "PASS\n", result_info }, UVM_HIGH)
         end
     endfunction : write
 

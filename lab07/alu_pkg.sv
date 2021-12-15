@@ -61,10 +61,11 @@ package alu_pkg;
     typedef packet_t[0:8] in_packets_t;
     typedef packet_t[0:4] out_packets_t;
 
+    `include "random_alu_input_transaction.svh"
+    `include "min_max_alu_input_transaction.svh"
     `include "coverage.svh"
-    `include "base_tester.svh"
-    `include "random_tester.svh"
-    `include "min_max_tester.svh"
+    `include "tester.svh"
+    `include "result_transaction.svh"
     `include "scoreboard.svh"
     `include "driver.svh"
     `include "alu_input_monitor.svh"

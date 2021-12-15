@@ -41,6 +41,10 @@ DEBUG=""
 RUN_IMC=""
 start_time=0
 time_report=""
+# PASSED="PASSED"
+# FAILED="FAILED"
+PASSED="\033[32m\033[107mPASSED\033[0m"
+FAILED="\033[31m\033[107mFAILED\033[0m"
 #>>>
 #------------------------------------------------------------------------------
 # check input script arguments and env#<<<
@@ -118,10 +122,10 @@ function xrun_check_status() { #<<<
   action=$2
 
   if [[ "$status" != "0" ]]; then
-    echo "$action failed with status $status".
+    echo -e "$action $FAILED with status $status".
     exit -1
   fi
-  echo "$action finished with status 0 (PASSED)."
+  echo -e "$action finished with status 0 ($PASSED)."
   return 0
 } #>>>
 #------------------------------------------------------------------------------

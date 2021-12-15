@@ -38,6 +38,7 @@ interface alu_bfm;
             sin = in_packets[i][j];
         end
 
+        alu_output = 0;
         @(negedge sout);
         if (alu_input.removed_packets_from_A || alu_input.removed_packets_from_B ||
                 alu_input.invalid_crc || !(alu_input.operation inside {`ALL_OPERATIONS})) begin
@@ -52,6 +53,7 @@ interface alu_bfm;
                 out_success_packets[2][8-:8], out_success_packets[3][8-:8]};
             alu_output.flags = out_success_packets[4][7-:$bits(flags_t)];
             alu_output.crc = out_success_packets[4][3-:$bits(out_crc_t)];
+            alu_output.error_flags = 0;
         end
 
         tb_state = SCORE_AND_COV_STATE;
@@ -108,8 +110,10 @@ interface alu_bfm;
     initial begin : alu_input_monitor_thread__reset
         forever begin
             @(negedge rst_n);
-            if (alu_input_monitor_h != null)
+            alu_input.action = RESET_ACTION;
+            if (alu_input_monitor_h != null) begin
                 alu_input_monitor_h.write_to_monitor(alu_input);
+            end
         end
     end : alu_input_monitor_thread__reset
 

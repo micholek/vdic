@@ -1,4 +1,4 @@
-class coverage extends uvm_subscriber#(alu_input_t);
+class coverage extends uvm_subscriber#(random_alu_input_transaction);
 
     `uvm_component_utils(coverage)
 
@@ -113,14 +113,14 @@ class coverage extends uvm_subscriber#(alu_input_t);
         error_cov = new();
     endfunction : new
 
-    function void write(alu_input_t t);
-        A = t.A;
-        B = t.B;
-        operation = t.operation;
-        removed_packets_from_A = t.removed_packets_from_A;
-        removed_packets_from_B = t.removed_packets_from_B;
-        action = t.action;
-        invalid_crc = t.invalid_crc;
+    function void write(random_alu_input_transaction t);
+        A = t.alu_input.A;
+        B = t.alu_input.B;
+        operation = t.alu_input.operation;
+        removed_packets_from_A = t.alu_input.removed_packets_from_A;
+        removed_packets_from_B = t.alu_input.removed_packets_from_B;
+        action = t.alu_input.action;
+        invalid_crc = t.alu_input.invalid_crc;
         operation_cov.sample();
         data_cov.sample();
         error_cov.sample();
