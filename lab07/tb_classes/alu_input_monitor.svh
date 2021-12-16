@@ -19,12 +19,8 @@ class alu_input_monitor extends uvm_component;
 
     function void write_to_monitor(alu_input_t alu_input);
         random_alu_input_transaction random_alu_input = new("random_alu_input");
-        `uvm_info("ALU INPUT MONITOR", $sformatf(
-                "\nA=%08h, B=%08h, rem_A=%0d, rem_B=%0d, op=%03b, invalid_crc=%b, crc=%04b, act=%b",
-                alu_input.A, alu_input.B, alu_input.removed_packets_from_A,
-                alu_input.removed_packets_from_B, alu_input.operation, alu_input.invalid_crc,
-                alu_input.crc, alu_input.action), UVM_HIGH);
         random_alu_input.alu_input = alu_input;
+        `uvm_info("ALU INPUT MONITOR", random_alu_input.convert2string(), UVM_HIGH);
         ap.write(random_alu_input);
     endfunction : write_to_monitor
 
