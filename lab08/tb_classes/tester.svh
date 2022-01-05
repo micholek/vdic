@@ -8,7 +8,7 @@ class tester extends uvm_component;
     endfunction : new
 
     function void build_phase(uvm_phase phase);
-        alu_input_port = new("command_port", this);
+        alu_input_port = new("alu_input_port", this);
     endfunction : build_phase
 
     task run_phase(uvm_phase phase);

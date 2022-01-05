@@ -12,10 +12,10 @@ run_quiet:
 	./run_xrun.sh -q
 
 run_gui:
-	./run_xrun.sh -gd
+	./run_xrun.sh -gdq
 
 run_cov:
-	./run_xrun.sh -c
+	./run_xrun.sh -cq
 
 clean: 
 	rm -f *.log

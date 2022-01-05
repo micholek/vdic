@@ -89,7 +89,7 @@ class random_alu_input_transaction extends uvm_transaction;
         end
     endfunction : generate_in_crc
 
-    function new (string name = "");
+    function new(string name = "");
         super.new(name);
     endfunction : new
 
