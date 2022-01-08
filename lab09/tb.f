@@ -1,8 +1,7 @@
 -F dut.f
 alu_pkg.sv
 alu_bfm.sv
-+incdir+.
-+incdir+tb_classes
+-incdir ./tb_classes
 top.sv
 
 -uvm

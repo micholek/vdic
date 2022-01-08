@@ -61,16 +61,23 @@ package alu_pkg;
     typedef packet_t[0:8] in_packets_t;
     typedef packet_t[0:4] out_packets_t;
 
-    `include "random_alu_input_transaction.svh"
-    `include "min_max_alu_input_transaction.svh"
-    `include "coverage.svh"
-    `include "tester.svh"
+    `include "sequence_item.svh"
+
     `include "result_transaction.svh"
+
+    typedef uvm_sequencer#(sequence_item) sequencer;
+
+    `include "random_sequence.svh"
+    `include "min_max_sequence.svh"
+
+    `include "coverage.svh"
     `include "scoreboard.svh"
     `include "driver.svh"
     `include "alu_input_monitor.svh"
     `include "result_monitor.svh"
     `include "env.svh"
+
+    `include "alu_base_test.svh"
     `include "random_test.svh"
     `include "min_max_test.svh"
 

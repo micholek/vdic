@@ -2,7 +2,7 @@ class scoreboard extends uvm_subscriber#(result_transaction);
 
     `uvm_component_utils(scoreboard)
 
-    uvm_tlm_analysis_fifo#(random_alu_input_transaction) alu_input_f;
+    uvm_tlm_analysis_fifo#(sequence_item) alu_input_f;
 
     protected string test_result;
 
@@ -25,10 +25,9 @@ class scoreboard extends uvm_subscriber#(result_transaction);
         };
     endfunction : calculate_out_crc
 
-    protected function result_transaction get_expected_output(
-            random_alu_input_transaction alu_input_transaction);
+    local function result_transaction get_expected_output(sequence_item seq);
         result_transaction expected = new("expected");
-        alu_input_t alu_input = alu_input_transaction.alu_input;
+        alu_input_t alu_input = seq.alu_input;
         operation_t op;
         automatic alu_output_t out = alu_output_t'(0);
         automatic bit [32:0] aux_buffer = 33'b0;
@@ -80,18 +79,18 @@ class scoreboard extends uvm_subscriber#(result_transaction);
     endfunction : build_phase
 
     function void write(result_transaction t);
-        random_alu_input_transaction random_alu_input_t;
+        sequence_item seq;
         result_transaction result;
         string result_info;
 
         do
-            if (!alu_input_f.try_get(random_alu_input_t)) begin
+            if (!alu_input_f.try_get(seq)) begin
                 $fatal(1, "Missing command in self checker");
             end
-        while (random_alu_input_t.alu_input.action == RESET_ACTION);
-        result = get_expected_output(random_alu_input_t);
+        while (seq.alu_input.action == RESET_ACTION);
+        result = get_expected_output(seq);
 
-        result_info = { random_alu_input_t.convert2string(), "\n\t   Actual: ", t.convert2string(),
+        result_info = { seq.convert2string(), "\n\t   Actual: ", t.convert2string(),
             "\n\t Expected: ", result.convert2string() };
 
         if (!result.compare(t)) begin

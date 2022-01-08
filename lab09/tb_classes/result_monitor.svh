@@ -2,6 +2,8 @@ class result_monitor extends uvm_component;
 
     `uvm_component_utils(result_monitor)
 
+    local virtual alu_bfm bfm;
+
     uvm_analysis_port#(result_transaction) ap;
 
     function new(string name, uvm_component parent);
@@ -15,12 +17,14 @@ class result_monitor extends uvm_component;
     endfunction : write_to_monitor
 
     function void build_phase(uvm_phase phase);
-        virtual alu_bfm bfm;
         if(!uvm_config_db#(virtual alu_bfm)::get(null, "*", "bfm", bfm)) begin
             `uvm_fatal("RESULT MONITOR", "Failed to get BFM")
         end
-        bfm.result_monitor_h = this;
         ap = new("ap", this);
     endfunction : build_phase
+
+    function void connect_phase(uvm_phase phase);
+        bfm.result_monitor_h = this;
+    endfunction : connect_phase
 
 endclass : result_monitor

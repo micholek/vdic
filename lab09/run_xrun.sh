@@ -43,8 +43,8 @@ start_time=0
 time_report=""
 # PASSED="PASSED"
 # FAILED="FAILED"
-PASSED="\033[32m\033[107mPASSED\033[0m"
-FAILED="\033[31m\033[107mFAILED\033[0m"
+PASSED="\033[1;30m\033[102m-OK-\033[0m"
+FAILED="\033[1;30m\033[101m-FAILED-\033[0m"
 #>>>
 #------------------------------------------------------------------------------
 # check input script arguments and env#<<<
@@ -170,6 +170,7 @@ function xrun_run_all_tests() { #<<<
         $COV_TEST \
         +UVM_TESTNAME=$TEST \
         -l xrun_test_$TEST.log
+      check_uvm_fatal "xrun_test_$TEST.log"
       xrun_check_status $? "Test $TEST"
     done
 
@@ -218,6 +219,17 @@ function time_meas_report { #<<<
   echo -n "Time measurement results:"
   echo "$time_report"
   echo $separator
+} #>>>
+#------------------------------------------------------------------------------
+function check_uvm_fatal() { #<<<
+# check for the UVM_FATAL in the given log file
+# args: string - log file name
+  logfile=$1
+  echo "CHECKING LOG FILE: $logfile"
+  if [[ $(egrep  -c "^UVM_FATAL *: *[123456789]" $logfile) != "0" ]]; then
+    echo -e "Simulation $FAILED with UVM_FATAL";
+    exit -1
+  fi
 } #>>>
 #------------------------------------------------------------------------------
 # run the main

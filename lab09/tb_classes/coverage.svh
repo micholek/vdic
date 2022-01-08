@@ -1,14 +1,14 @@
-class coverage extends uvm_subscriber#(random_alu_input_transaction);
+class coverage extends uvm_subscriber#(sequence_item);
 
     `uvm_component_utils(coverage)
 
-    protected bit [31:0] A;
-    protected bit [31:0] B;
-    protected bit [2:0] operation;
-    protected bit [2:0] removed_packets_from_A;
-    protected bit [2:0] removed_packets_from_B;
-    protected action_t action;
-    protected bit invalid_crc;
+    local bit [31:0] A;
+    local bit [31:0] B;
+    local bit [2:0] operation;
+    local bit [2:0] removed_packets_from_A;
+    local bit [2:0] removed_packets_from_B;
+    local action_t action;
+    local bit invalid_crc;
 
     covergroup operation_cov;
         option.name = "cg_operation_cov";
@@ -113,7 +113,7 @@ class coverage extends uvm_subscriber#(random_alu_input_transaction);
         error_cov = new();
     endfunction : new
 
-    function void write(random_alu_input_transaction t);
+    function void write(sequence_item t);
         A = t.alu_input.A;
         B = t.alu_input.B;
         operation = t.alu_input.operation;

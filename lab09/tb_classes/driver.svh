@@ -1,9 +1,8 @@
-class driver extends uvm_component;
+class driver extends uvm_driver#(sequence_item);
 
     `uvm_component_utils(driver)
 
-    virtual alu_bfm bfm;
-    uvm_get_port#(random_alu_input_transaction) alu_input_port;
+    protected virtual alu_bfm bfm;
 
     function new (string name, uvm_component parent);
         super.new(name, parent);
@@ -13,15 +12,17 @@ class driver extends uvm_component;
         if(!uvm_config_db#(virtual alu_bfm)::get(null, "*", "bfm", bfm)) begin
             `uvm_fatal("DRIVER", "Failed to get BFM")
         end
-        alu_input_port = new("alu_input_port", this);
     endfunction : build_phase
 
     task run_phase(uvm_phase phase);
-        random_alu_input_transaction alu_input;
-        forever begin
-            alu_input_port.get(alu_input);
-            bfm.send_input(alu_input.alu_input);
-        end
+        sequence_item seq;
+        void'(begin_tr(seq));
+        forever begin : seq_loop
+            seq_item_port.get_next_item(seq);
+            bfm.send_input(seq.alu_input, seq.alu_output);
+            seq_item_port.item_done();
+        end : seq_loop
+        end_tr(seq);
     endtask : run_phase
 
 endclass : driver

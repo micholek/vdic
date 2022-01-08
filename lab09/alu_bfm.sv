@@ -24,7 +24,7 @@ interface alu_bfm;
         rst_n = 1'b1;
     endtask : reset_alu
 
-    task send_input(alu_input_t alu_in);
+    task send_input(alu_input_t alu_in, output alu_output_t alu_out);
         in_packets_t in_packets;
         alu_input = alu_in;
         if (alu_input.action == RESET_ACTION) begin
@@ -55,6 +55,7 @@ interface alu_bfm;
             alu_output.crc = out_success_packets[4][3-:$bits(out_crc_t)];
             alu_output.error_flags = 0;
         end
+        alu_out = alu_output;
 
         tb_state = SCORE_AND_COV_STATE;
         @(negedge clk);
